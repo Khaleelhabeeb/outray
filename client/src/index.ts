@@ -1,6 +1,6 @@
 import { CoreClient } from "./CoreClient";
 
-const serverUrl = process.env.SERVER_URL || "ws://localhost:3000";
+const serverUrl = process.env.SERVER_URL || "ws://localhost:3547";
 const localPort = parseInt(process.env.LOCAL_PORT || "8080", 10);
 
 const client = new CoreClient(serverUrl, localPort);

@@ -17,7 +17,7 @@ export class LocalForwarder {
     method: string,
     path: string,
     headers: Record<string, string | string[]>,
-    body?: string,
+    bodyBase64?: string,
   ): Promise<ForwardedResponse> {
     return new Promise((resolve, reject) => {
       const options: http.RequestOptions = {
@@ -29,10 +29,10 @@ export class LocalForwarder {
       };
 
       const req = http.request(options, (res) => {
-        let responseBody = "";
+        const chunks: Buffer[] = [];
 
-        res.on("data", (chunk) => {
-          responseBody += chunk;
+        res.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
         });
 
         res.on("end", () => {
@@ -43,10 +43,14 @@ export class LocalForwarder {
             }
           });
 
+          const responseBuffer = Buffer.concat(chunks);
+          const responseBodyBase64 =
+            responseBuffer.length > 0 ? responseBuffer.toString("base64") : "";
+
           resolve({
             statusCode: res.statusCode || 200,
             headers: responseHeaders,
-            body: responseBody,
+            body: responseBodyBase64,
           });
         });
       });
@@ -55,8 +59,9 @@ export class LocalForwarder {
         reject(error);
       });
 
-      if (body) {
-        req.write(body);
+      if (bodyBase64) {
+        const bodyBuffer = Buffer.from(bodyBase64, "base64");
+        req.write(bodyBuffer);
       }
 
       req.end();

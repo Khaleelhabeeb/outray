@@ -7,7 +7,8 @@ export function extractSubdomain(
   host: string,
   baseDomain: string,
 ): string | null {
-  const hostLower = host.toLowerCase();
+  const hostWithoutPort = host.split(":")[0];
+  const hostLower = hostWithoutPort.toLowerCase();
   const baseLower = baseDomain.toLowerCase();
 
   if (hostLower.endsWith(`.${baseLower}`)) {

@@ -19,7 +19,7 @@ export class HTTPProxy {
     const tunnelId = extractSubdomain(host, this.baseDomain);
 
     if (!tunnelId) {
-      res.writeHead(404);
+      res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("Tunnel not found");
       return;
     }
@@ -32,24 +32,33 @@ export class HTTPProxy {
         }
       });
 
-      let body = "";
+      const chunks: Buffer[] = [];
       for await (const chunk of req) {
-        body += chunk;
+        chunks.push(Buffer.from(chunk));
       }
+      const bodyBuffer = Buffer.concat(chunks);
+      const bodyBase64 =
+        bodyBuffer.length > 0 ? bodyBuffer.toString("base64") : undefined;
 
       const response = await this.router.forwardRequest(
         tunnelId,
         req.method || "GET",
         req.url || "/",
         headers,
-        body || undefined,
+        bodyBase64,
       );
 
       res.writeHead(response.statusCode, response.headers);
-      res.end(response.body || "");
+
+      if (response.body) {
+        const responseBuffer = Buffer.from(response.body, "base64");
+        res.end(responseBuffer);
+      } else {
+        res.end();
+      }
     } catch (error) {
       console.error("Proxy error:", error);
-      res.writeHead(502);
+      res.writeHead(502, { "Content-Type": "text/plain" });
       res.end("Bad Gateway");
     }
   }
