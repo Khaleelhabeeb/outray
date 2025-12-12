@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { Protocol, Message, RequestMessage } from "./Protocol";
 import { LocalForwarder } from "./LocalForwarder";
-import { generateId } from "../../shared/utils";
+import { generateId } from "../../../shared/utils";
 
 export class CoreClient {
   private ws: WebSocket | null = null;

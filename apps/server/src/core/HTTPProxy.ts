@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from "http";
 import { TunnelRouter } from "./TunnelRouter";
-import { extractSubdomain } from "../../../shared/utils";
+import { extractSubdomain } from "../../../../shared/utils";
 
 export class HTTPProxy {
   private router: TunnelRouter;

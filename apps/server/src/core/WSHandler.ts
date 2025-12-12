@@ -2,7 +2,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import { Server as HTTPServer } from "http";
 import { TunnelRouter } from "./TunnelRouter";
 import { Protocol, Message } from "./Protocol";
-import { generateId } from "../../../shared/utils";
+import { generateId } from "../../../../shared/utils";
 
 export class WSHandler {
   private wss: WebSocketServer;

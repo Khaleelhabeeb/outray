@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import { Protocol, RequestMessage, ResponseMessage, Message } from "./Protocol";
-import { generateId } from "../../../shared/utils";
+import { generateId } from "../../../../shared/utils";
 
 interface PendingRequest {
   resolve: (response: ResponseMessage) => void;

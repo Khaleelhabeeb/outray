@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "server",
-    "client"
+    "apps/server",
+    "apps/client"
   ],
   "scripts": {
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../web && npm install",
-    "dev:server": "cd server && npm run dev",
-    "dev:client": "cd client && npm run dev",
-    "dev:web": "cd web && npm run dev",
-    "build": "cd server && npm run build && cd ../client && npm run build && cd ../web && npm run build"
+    "install:all": "npm install && cd apps/server && npm install && cd ../client && npm install && cd ../web && npm install",
+    "dev:server": "cd apps/server && npm run dev",
+    "dev:client": "cd apps/client && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "build": "cd apps/server && npm run build && cd ../client && npm run build && cd ../web && npm run build"
   },
   "devDependencies": {
     "typescript": "^5.7.2"
