@@ -76,6 +76,16 @@ export class OutRayClient {
         this.assignedUrl = message.url;
         console.log(chalk.magenta(`🌐 Tunnel ready: ${message.url}`));
         console.log(chalk.yellow("🥹 Don't close this or I'll cry softly."));
+      } else if (message.type === "error") {
+        console.log(chalk.red(`❌ Error: ${message.message}`));
+        if (
+          message.code === "AUTH_FAILED" ||
+          message.code === "SUBDOMAIN_TAKEN"
+        ) {
+          this.shouldReconnect = false;
+          this.stop();
+          process.exit(1);
+        }
       } else if (message.type === "request") {
         this.handleTunnelData(message);
       }
