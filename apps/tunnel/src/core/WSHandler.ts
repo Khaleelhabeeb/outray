@@ -19,6 +19,7 @@ export class WSHandler {
 
   private async validateAuthToken(token: string): Promise<{
     valid: boolean;
+    userId?: string;
     organizationId?: string;
     organization?: any;
     error?: string;
@@ -66,6 +67,28 @@ export class WSHandler {
     }
   }
 
+  private async registerTunnelInDatabase(
+    subdomain: string,
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    try {
+      await fetch(`${this.webApiUrl}/tunnel/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subdomain,
+          userId,
+          organizationId,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to register tunnel in database:", error);
+      // Don't fail the tunnel if DB registration fails
+      // The tunnel is already live in Redis, so it should work
+    }
+  }
+
   private setupWebSocketServer(): void {
     this.wss.on("connection", (ws: WebSocket) => {
       let tunnelId: string | null = null;
@@ -78,6 +101,7 @@ export class WSHandler {
             console.log(`Client connected: ${message.clientId}`);
           } else if (message.type === "open_tunnel") {
             let organizationId: string | undefined;
+            let userId: string | undefined;
 
             if (message.apiKey) {
               const authResult = await this.validateAuthToken(message.apiKey);
@@ -94,6 +118,7 @@ export class WSHandler {
                 return;
               }
               organizationId = authResult.organizationId;
+              userId = authResult.userId;
               console.log(
                 `Authenticated organization: ${authResult.organization?.name}`,
               );
@@ -177,6 +202,15 @@ export class WSHandler {
               );
               ws.close();
               return;
+            }
+
+            // Register tunnel in database if user is authenticated
+            if (userId && organizationId) {
+              await this.registerTunnelInDatabase(
+                tunnelId,
+                userId,
+                organizationId,
+              );
             }
 
             const response = Protocol.encode({
