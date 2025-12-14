@@ -54,7 +54,7 @@ echo "🟢 Deploying to: $TARGET_COLOR (Tunnel Server: $TARGET_NAME on Port $TAR
 
 # 1. Start Tunnel Server
 BASE_DOMAIN="outray.dev" \
-WEB_API_URL="https://outray.dev/api" \
+WEB_API_URL="https://alpha.outray.dev/api" \
 PORT=$TARGET_PORT \
 REDIS_URL="$REDIS_URL" \
 REDIS_TUNNEL_TTL_SECONDS="$REDIS_TUNNEL_TTL_SECONDS" \
