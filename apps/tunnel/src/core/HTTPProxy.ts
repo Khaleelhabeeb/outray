@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { TunnelRouter } from "./TunnelRouter";
 import { extractSubdomain } from "../../../../shared/utils";
+import { logger } from "../lib/clickhouse";
 
 export class HTTPProxy {
   private router: TunnelRouter;
@@ -17,6 +18,7 @@ export class HTTPProxy {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    const start = Date.now();
     const host = req.headers.host || "";
     const tunnelId = extractSubdomain(host, this.baseDomain);
 
@@ -52,17 +54,65 @@ export class HTTPProxy {
 
       res.writeHead(response.statusCode, response.headers);
 
+      let responseSize = 0;
       if (response.body) {
         const responseBuffer = Buffer.from(response.body, "base64");
+        responseSize = responseBuffer.length;
         res.end(responseBuffer);
       } else {
         res.end();
       }
+
+      const metadata = this.router.getTunnelMetadata(tunnelId);
+      if (metadata?.organizationId) {
+        logger.log({
+          timestamp: Date.now(),
+          tunnel_id: metadata.dbTunnelId || tunnelId,
+          organization_id: metadata.organizationId,
+          host: host,
+          method: req.method || "GET",
+          path: req.url || "/",
+          status_code: response.statusCode,
+          latency_ms: Date.now() - start,
+          bytes_in: bodyBuffer.length,
+          bytes_out: responseSize,
+          client_ip: this.getClientIp(req),
+          user_agent: req.headers["user-agent"] || "",
+        });
+      }
     } catch (error) {
-      console.error("Proxy error:", error);
+      if (error instanceof Error && error.message === "Tunnel disconnected") {
+        console.log(`⚠️ Tunnel disconnected during request: ${tunnelId}`);
+      } else {
+        console.error("Proxy error:", error);
+      }
       res.writeHead(502, { "Content-Type": "text/html" });
       res.end(this.getOfflineHtml(tunnelId));
     }
+  }
+
+  private getClientIp(req: IncomingMessage): string {
+    let ip =
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      "0.0.0.0";
+
+    // Handle comma-separated list in x-forwarded-for
+    if (ip.includes(",")) {
+      ip = ip.split(",")[0].trim();
+    }
+
+    // Handle IPv4-mapped IPv6 addresses
+    if (ip.startsWith("::ffff:")) {
+      ip = ip.substring(7);
+    }
+
+    // Handle localhost IPv6
+    if (ip === "::1") {
+      ip = "127.0.0.1";
+    }
+
+    return ip;
   }
 
   private getOfflineHtml(tunnelId: string): string {
