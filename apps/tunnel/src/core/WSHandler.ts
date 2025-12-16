@@ -10,9 +10,9 @@ export class WSHandler {
   private router: TunnelRouter;
   private webApiUrl: string;
 
-  constructor(httpServer: HTTPServer, router: TunnelRouter) {
+  constructor(wss: WebSocketServer, router: TunnelRouter) {
     this.router = router;
-    this.wss = new WebSocketServer({ server: httpServer });
+    this.wss = wss;
     this.webApiUrl = process.env.WEB_API_URL || "http://localhost:3000/api";
     this.setupWebSocketServer();
   }
