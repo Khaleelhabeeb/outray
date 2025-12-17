@@ -14,9 +14,11 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashRouteImport } from './routes/dash'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashIndexRouteImport } from './routes/dash/index'
+import { Route as DashSubdomainsRouteImport } from './routes/dash/subdomains'
 import { Route as DashSettingsRouteImport } from './routes/dash/settings'
 import { Route as DashRequestsRouteImport } from './routes/dash/requests'
 import { Route as DashInstallRouteImport } from './routes/dash/install'
+import { Route as ApiSubdomainsRouteImport } from './routes/api/subdomains'
 import { Route as ApiAuthTokensRouteImport } from './routes/api/auth-tokens'
 import { Route as DashTunnelsIndexRouteImport } from './routes/dash/tunnels/index'
 import { Route as ApiTunnelsIndexRouteImport } from './routes/api/tunnels/index'
@@ -25,6 +27,7 @@ import { Route as ApiTunnelsTunnelIdRouteImport } from './routes/api/tunnels/$tu
 import { Route as ApiTunnelRegisterRouteImport } from './routes/api/tunnel/register'
 import { Route as ApiTunnelCheckSubdomainRouteImport } from './routes/api/tunnel/check-subdomain'
 import { Route as ApiTunnelAuthRouteImport } from './routes/api/tunnel/auth'
+import { Route as ApiSubdomainsSubdomainIdRouteImport } from './routes/api/subdomains/$subdomainId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -52,6 +55,11 @@ const DashIndexRoute = DashIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashRoute,
 } as any)
+const DashSubdomainsRoute = DashSubdomainsRouteImport.update({
+  id: '/subdomains',
+  path: '/subdomains',
+  getParentRoute: () => DashRoute,
+} as any)
 const DashSettingsRoute = DashSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -66,6 +74,11 @@ const DashInstallRoute = DashInstallRouteImport.update({
   id: '/install',
   path: '/install',
   getParentRoute: () => DashRoute,
+} as any)
+const ApiSubdomainsRoute = ApiSubdomainsRouteImport.update({
+  id: '/api/subdomains',
+  path: '/api/subdomains',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthTokensRoute = ApiAuthTokensRouteImport.update({
   id: '/api/auth-tokens',
@@ -107,6 +120,12 @@ const ApiTunnelAuthRoute = ApiTunnelAuthRouteImport.update({
   path: '/api/tunnel/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSubdomainsSubdomainIdRoute =
+  ApiSubdomainsSubdomainIdRouteImport.update({
+    id: '/$subdomainId',
+    path: '/$subdomainId',
+    getParentRoute: () => ApiSubdomainsRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -119,11 +138,14 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
+  '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/dash/install': typeof DashInstallRoute
   '/dash/requests': typeof DashRequestsRoute
   '/dash/settings': typeof DashSettingsRoute
+  '/dash/subdomains': typeof DashSubdomainsRoute
   '/dash/': typeof DashIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/subdomains/$subdomainId': typeof ApiSubdomainsSubdomainIdRoute
   '/api/tunnel/auth': typeof ApiTunnelAuthRoute
   '/api/tunnel/check-subdomain': typeof ApiTunnelCheckSubdomainRoute
   '/api/tunnel/register': typeof ApiTunnelRegisterRoute
@@ -137,11 +159,14 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
+  '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/dash/install': typeof DashInstallRoute
   '/dash/requests': typeof DashRequestsRoute
   '/dash/settings': typeof DashSettingsRoute
+  '/dash/subdomains': typeof DashSubdomainsRoute
   '/dash': typeof DashIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/subdomains/$subdomainId': typeof ApiSubdomainsSubdomainIdRoute
   '/api/tunnel/auth': typeof ApiTunnelAuthRoute
   '/api/tunnel/check-subdomain': typeof ApiTunnelCheckSubdomainRoute
   '/api/tunnel/register': typeof ApiTunnelRegisterRoute
@@ -157,11 +182,14 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
+  '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/dash/install': typeof DashInstallRoute
   '/dash/requests': typeof DashRequestsRoute
   '/dash/settings': typeof DashSettingsRoute
+  '/dash/subdomains': typeof DashSubdomainsRoute
   '/dash/': typeof DashIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/subdomains/$subdomainId': typeof ApiSubdomainsSubdomainIdRoute
   '/api/tunnel/auth': typeof ApiTunnelAuthRoute
   '/api/tunnel/check-subdomain': typeof ApiTunnelCheckSubdomainRoute
   '/api/tunnel/register': typeof ApiTunnelRegisterRoute
@@ -178,11 +206,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/api/auth-tokens'
+    | '/api/subdomains'
     | '/dash/install'
     | '/dash/requests'
     | '/dash/settings'
+    | '/dash/subdomains'
     | '/dash/'
     | '/api/auth/$'
+    | '/api/subdomains/$subdomainId'
     | '/api/tunnel/auth'
     | '/api/tunnel/check-subdomain'
     | '/api/tunnel/register'
@@ -196,11 +227,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/api/auth-tokens'
+    | '/api/subdomains'
     | '/dash/install'
     | '/dash/requests'
     | '/dash/settings'
+    | '/dash/subdomains'
     | '/dash'
     | '/api/auth/$'
+    | '/api/subdomains/$subdomainId'
     | '/api/tunnel/auth'
     | '/api/tunnel/check-subdomain'
     | '/api/tunnel/register'
@@ -215,11 +249,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/api/auth-tokens'
+    | '/api/subdomains'
     | '/dash/install'
     | '/dash/requests'
     | '/dash/settings'
+    | '/dash/subdomains'
     | '/dash/'
     | '/api/auth/$'
+    | '/api/subdomains/$subdomainId'
     | '/api/tunnel/auth'
     | '/api/tunnel/check-subdomain'
     | '/api/tunnel/register'
@@ -235,6 +272,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiAuthTokensRoute: typeof ApiAuthTokensRoute
+  ApiSubdomainsRoute: typeof ApiSubdomainsRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTunnelAuthRoute: typeof ApiTunnelAuthRoute
   ApiTunnelCheckSubdomainRoute: typeof ApiTunnelCheckSubdomainRoute
@@ -280,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashIndexRouteImport
       parentRoute: typeof DashRoute
     }
+    '/dash/subdomains': {
+      id: '/dash/subdomains'
+      path: '/subdomains'
+      fullPath: '/dash/subdomains'
+      preLoaderRoute: typeof DashSubdomainsRouteImport
+      parentRoute: typeof DashRoute
+    }
     '/dash/settings': {
       id: '/dash/settings'
       path: '/settings'
@@ -300,6 +345,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dash/install'
       preLoaderRoute: typeof DashInstallRouteImport
       parentRoute: typeof DashRoute
+    }
+    '/api/subdomains': {
+      id: '/api/subdomains'
+      path: '/api/subdomains'
+      fullPath: '/api/subdomains'
+      preLoaderRoute: typeof ApiSubdomainsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/auth-tokens': {
       id: '/api/auth-tokens'
@@ -357,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTunnelAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/subdomains/$subdomainId': {
+      id: '/api/subdomains/$subdomainId'
+      path: '/$subdomainId'
+      fullPath: '/api/subdomains/$subdomainId'
+      preLoaderRoute: typeof ApiSubdomainsSubdomainIdRouteImport
+      parentRoute: typeof ApiSubdomainsRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -371,6 +430,7 @@ interface DashRouteChildren {
   DashInstallRoute: typeof DashInstallRoute
   DashRequestsRoute: typeof DashRequestsRoute
   DashSettingsRoute: typeof DashSettingsRoute
+  DashSubdomainsRoute: typeof DashSubdomainsRoute
   DashIndexRoute: typeof DashIndexRoute
   DashTunnelsTunnelIdRoute: typeof DashTunnelsTunnelIdRoute
   DashTunnelsIndexRoute: typeof DashTunnelsIndexRoute
@@ -380,6 +440,7 @@ const DashRouteChildren: DashRouteChildren = {
   DashInstallRoute: DashInstallRoute,
   DashRequestsRoute: DashRequestsRoute,
   DashSettingsRoute: DashSettingsRoute,
+  DashSubdomainsRoute: DashSubdomainsRoute,
   DashIndexRoute: DashIndexRoute,
   DashTunnelsTunnelIdRoute: DashTunnelsTunnelIdRoute,
   DashTunnelsIndexRoute: DashTunnelsIndexRoute,
@@ -387,12 +448,25 @@ const DashRouteChildren: DashRouteChildren = {
 
 const DashRouteWithChildren = DashRoute._addFileChildren(DashRouteChildren)
 
+interface ApiSubdomainsRouteChildren {
+  ApiSubdomainsSubdomainIdRoute: typeof ApiSubdomainsSubdomainIdRoute
+}
+
+const ApiSubdomainsRouteChildren: ApiSubdomainsRouteChildren = {
+  ApiSubdomainsSubdomainIdRoute: ApiSubdomainsSubdomainIdRoute,
+}
+
+const ApiSubdomainsRouteWithChildren = ApiSubdomainsRoute._addFileChildren(
+  ApiSubdomainsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashRoute: DashRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   ApiAuthTokensRoute: ApiAuthTokensRoute,
+  ApiSubdomainsRoute: ApiSubdomainsRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTunnelAuthRoute: ApiTunnelAuthRoute,
   ApiTunnelCheckSubdomainRoute: ApiTunnelCheckSubdomainRoute,
