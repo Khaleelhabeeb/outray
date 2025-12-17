@@ -30,14 +30,18 @@ export const subdomains = pgTable(
   {
     id: text("id").primaryKey(),
     subdomain: text("subdomain").notNull().unique(),
-    tunnelId: text("tunnel_id")
+    organizationId: text("organization_id")
       .notNull()
-      .references(() => tunnels.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     index("subdomains_subdomain_idx").on(table.subdomain),
-    index("subdomains_tunnelId_idx").on(table.tunnelId),
+    index("subdomains_organizationId_idx").on(table.organizationId),
+    index("subdomains_userId_idx").on(table.userId),
   ],
 );
 
@@ -62,7 +66,7 @@ export const authTokens = pgTable(
   ],
 );
 
-export const tunnelsRelations = relations(tunnels, ({ one, many }) => ({
+export const tunnelsRelations = relations(tunnels, ({ one }) => ({
   user: one(users, {
     fields: [tunnels.userId],
     references: [users.id],
@@ -71,13 +75,16 @@ export const tunnelsRelations = relations(tunnels, ({ one, many }) => ({
     fields: [tunnels.organizationId],
     references: [organizations.id],
   }),
-  subdomains: many(subdomains),
 }));
 
 export const subdomainsRelations = relations(subdomains, ({ one }) => ({
-  tunnel: one(tunnels, {
-    fields: [subdomains.tunnelId],
-    references: [tunnels.id],
+  organization: one(organizations, {
+    fields: [subdomains.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [subdomains.userId],
+    references: [users.id],
   }),
 }));
 
@@ -95,9 +102,11 @@ export const authTokensRelations = relations(authTokens, ({ one }) => ({
 export const usersAppRelations = relations(users, ({ many }) => ({
   tunnels: many(tunnels),
   authTokens: many(authTokens),
+  subdomains: many(subdomains),
 }));
 
 export const organizationsAppRelations = relations(organizations, ({ many }) => ({
   tunnels: many(tunnels),
   authTokens: many(authTokens),
+  subdomains: many(subdomains),
 }));
