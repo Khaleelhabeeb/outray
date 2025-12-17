@@ -133,17 +133,37 @@ async function main() {
   }
 
   let subdomain: string | undefined;
-  const subdomainIndex = remainingArgs.indexOf("--subdomain");
-  if (subdomainIndex !== -1 && remainingArgs[subdomainIndex + 1]) {
-    subdomain = remainingArgs[subdomainIndex + 1];
+  const subdomainArg = remainingArgs.find((arg) =>
+    arg.startsWith("--subdomain"),
+  );
+  if (subdomainArg) {
+    if (subdomainArg.includes("=")) {
+      // Format: --subdomain=value
+      subdomain = subdomainArg.split("=")[1];
+    } else {
+      // Format: --subdomain value
+      const subdomainIndex = remainingArgs.indexOf(subdomainArg);
+      if (subdomainIndex !== -1 && remainingArgs[subdomainIndex + 1]) {
+        subdomain = remainingArgs[subdomainIndex + 1];
+      }
+    }
   }
 
   const config = loadConfig();
   let apiKey = process.env.OUTRAY_API_KEY || config.token;
 
-  const keyIndex = remainingArgs.indexOf("--key");
-  if (keyIndex !== -1 && remainingArgs[keyIndex + 1]) {
-    apiKey = remainingArgs[keyIndex + 1];
+  const keyArg = remainingArgs.find((arg) => arg.startsWith("--key"));
+  if (keyArg) {
+    if (keyArg.includes("=")) {
+      // Format: --key=value
+      apiKey = keyArg.split("=")[1];
+    } else {
+      // Format: --key value
+      const keyIndex = remainingArgs.indexOf(keyArg);
+      if (keyIndex !== -1 && remainingArgs[keyIndex + 1]) {
+        apiKey = remainingArgs[keyIndex + 1];
+      }
+    }
   }
 
   const client = new OutRayClient(localPort!, serverUrl, apiKey, subdomain);
