@@ -12,15 +12,22 @@ import {
   Loader2,
 } from "lucide-react";
 import { appClient } from "../../../lib/app-client";
+import { authClient } from "../../../lib/auth-client";
 
 export const Route = createFileRoute("/dash/tunnels/")({
   component: TunnelsView,
 });
 
 function TunnelsView() {
+  const { data: activeOrg } = authClient.useActiveOrganization();
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["tunnels"],
-    queryFn: () => appClient.tunnels.list(),
+    queryKey: ["tunnels", activeOrg?.id],
+    queryFn: () => {
+      if (!activeOrg?.id) throw new Error("No active organization");
+      return appClient.tunnels.list(activeOrg.id);
+    },
+    enabled: !!activeOrg?.id,
   });
 
   if (isLoading) {
