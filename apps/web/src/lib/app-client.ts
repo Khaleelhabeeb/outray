@@ -127,6 +127,7 @@ export const appClient = {
         activeTunnelsChange: number;
         totalDataTransfer: number;
         dataTransferChange: number;
+        chartData: Array<{ hour: string; requests: number }>;
       }>("get", "/api/stats/overview", {
         params: { organizationId },
       }),
