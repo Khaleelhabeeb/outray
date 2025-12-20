@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { appClient } from "../../../lib/app-client";
 import {
   ArrowLeft,
@@ -11,7 +11,6 @@ import {
   Settings,
   Copy,
   ExternalLink,
-  RefreshCw,
   Power,
   MoreVertical,
   Search,
@@ -58,7 +57,11 @@ function TunnelDetailView() {
     queryFn: () => appClient.tunnels.get(tunnelId),
   });
 
-  const { data: statsData, isLoading: statsLoading } = useQuery({
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: ["tunnelStats", tunnelId, timeRange],
     queryFn: async () => {
       const result = await appClient.stats.tunnel(tunnelId, timeRange);
@@ -66,6 +69,7 @@ function TunnelDetailView() {
       return result;
     },
     refetchInterval: 5000,
+    placeholderData: keepPreviousData,
   });
 
   const tunnel = tunnelData && "tunnel" in tunnelData ? tunnelData.tunnel : null;
@@ -142,10 +146,6 @@ function TunnelDetailView() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/5 transition-colors text-sm font-medium">
-              <RefreshCw size={16} />
-              Restart
-            </button>
             <button className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-colors text-sm font-medium">
               <Power size={16} />
               Stop
@@ -202,7 +202,12 @@ function TunnelDetailView() {
               </div>
             ))}
           </div>
-          <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
+          <div className="bg-white/2 border border-white/5 rounded-2xl p-6 relative">
+            {isPlaceholderData && (
+              <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-10 rounded-2xl flex items-center justify-center transition-all duration-200">
+                <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              </div>
+            )}
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-medium text-white">Traffic Overview</h3>
@@ -227,14 +232,7 @@ function TunnelDetailView() {
             <div className="h-75 w-full">
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.map(d => ({
-                    ...d,
-                    time: new Date(d.time).toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false,
-                    })
-                  }))}>
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#FFA62B" stopOpacity={0.3} />
@@ -249,6 +247,27 @@ function TunnelDetailView() {
                       tickLine={false} 
                       axisLine={false}
                       interval="preserveStartEnd"
+                      minTickGap={30}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        if (timeRange === "1h") {
+                          return date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          });
+                        } else if (timeRange === "24h") {
+                          return date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            hour12: true,
+                          });
+                        } else {
+                          return date.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          });
+                        }
+                      }}
                     />
                     <YAxis 
                       stroke="#666" 
@@ -266,6 +285,15 @@ function TunnelDetailView() {
                       }}
                       itemStyle={{ color: "#fff" }}
                       labelStyle={{ color: "#9ca3af", marginBottom: "0.25rem" }}
+                      labelFormatter={(value) => {
+                        return new Date(value).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        });
+                      }}
                     />
                     <Area
                       type="monotone"
@@ -410,7 +438,6 @@ function TunnelDetailView() {
           </div>
         </div>
       )}
-
       {activeTab === "security" && (
         <div className="space-y-6 max-w-4xl mx-auto">
           <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
