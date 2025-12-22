@@ -24,6 +24,14 @@ interface TunnelEvent {
 
 type TimeRange = "live" | "1h" | "24h" | "7d" | "30d";
 
+const TIME_RANGES = [
+  { value: "live" as TimeRange, label: "Live", icon: Radio },
+  { value: "1h" as TimeRange, label: "1h" },
+  { value: "24h" as TimeRange, label: "24h" },
+  { value: "7d" as TimeRange, label: "7d" },
+  { value: "30d" as TimeRange, label: "30d" },
+];
+
 function RequestsView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [requests, setRequests] = useState<TunnelEvent[]>([]);
@@ -32,6 +40,9 @@ function RequestsView() {
   const { selectedOrganizationId } = useAppStore();
   const activeOrgId = selectedOrganizationId;
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Calculate the position of the sliding indicator
+  const activeIndex = TIME_RANGES.findIndex((r) => r.value === timeRange);
 
   // Fetch historical requests from API
   const fetchHistoricalRequests = async (range: TimeRange) => {
@@ -153,21 +164,25 @@ function RequestsView() {
           />
         </div>
 
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
-          {[
-            { value: "live" as TimeRange, label: "Live", icon: Radio },
-            { value: "1h" as TimeRange, label: "1h" },
-            { value: "24h" as TimeRange, label: "24h" },
-            { value: "7d" as TimeRange, label: "7d" },
-            { value: "30d" as TimeRange, label: "30d" },
-          ].map(({ value, label, icon: Icon }) => (
+        {/* Time Range Selector with Sliding Background */}
+        <div className="relative grid grid-cols-5 items-center bg-white/5 border border-white/10 rounded-xl p-1">
+          {/* Sliding background indicator */}
+          <div
+            className="absolute top-1 bottom-1 left-1 bg-accent rounded-lg transition-all duration-300 ease-out shadow-sm"
+            style={{
+              width: `calc((100% - 0.5rem) / ${TIME_RANGES.length})`,
+              transform: `translateX(${activeIndex * 100}%)`,
+            }}
+          />
+
+          {TIME_RANGES.map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               onClick={() => setTimeRange(value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 ${
                 timeRange === value
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-gray-400 hover:text-gray-300 hover:bg-white/5"
+                  ? "text-white"
+                  : "text-gray-400 hover:text-gray-300"
               }`}
             >
               {Icon && (
