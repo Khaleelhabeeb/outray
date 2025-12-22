@@ -1,9 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
 import { auth } from "../../../lib/auth";
-import { db } from "../../../db";
-import { tunnels } from "../../../db/app-schema";
 import { redis } from "../../../lib/redis";
 import { createClient } from "@clickhouse/client";
 
@@ -189,37 +186,12 @@ export const Route = createFileRoute("/api/stats/overview")({
                 ? 100
                 : 0;
 
-          // Get active tunnels count from database and check Redis for online status
-          const userTunnels = await db
-            .select({
-              id: tunnels.id,
-              url: tunnels.url,
-            })
-            .from(tunnels)
-            .where(eq(tunnels.organizationId, organizationId));
-
-          // Check how many are online in Redis
-          let activeTunnelsCount = 0;
-          for (const tunnel of userTunnels) {
-            let subdomain = "";
-            try {
-              const urlObj = new URL(
-                tunnel.url.startsWith("http")
-                  ? tunnel.url
-                  : `https://${tunnel.url}`,
-              );
-              subdomain = urlObj.hostname.split(".")[0];
-            } catch (e) {
-              console.error("Failed to parse tunnel URL:", tunnel.url);
-            }
-
-            if (subdomain) {
-              const isOnline = await redis.exists(`tunnel:online:${subdomain}`);
-              if (isOnline) {
-                activeTunnelsCount++;
-              }
-            }
-          }
+          // Get active tunnels count from Redis ZSET
+          const zsetKey = `org:${organizationId}:active_tunnels`;
+          // Remove expired entries
+          await redis.zremrangebyscore(zsetKey, "-inf", Date.now());
+          // Count active tunnels
+          const activeTunnelsCount = await redis.zcard(zsetKey);
 
           // Get chart data based on time range
           let chartQuery = "";
