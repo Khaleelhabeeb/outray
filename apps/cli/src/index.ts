@@ -67,7 +67,7 @@ async function main() {
     (isDev ? "ws://localhost:3547" : "wss://api.outray.dev/");
   const webUrl =
     process.env.OUTRAY_WEB_URL ||
-    (isDev ? "http://localhost:3000" : "https://beta.outray.dev");
+    (isDev ? "http://localhost:3000" : "https://console.outray.dev");
 
   if (!command) {
     console.log(chalk.red("❌ Please specify a command"));
