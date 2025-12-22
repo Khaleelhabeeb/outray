@@ -15,6 +15,13 @@
       "when": 1765979606762,
       "tag": "0001_ancient_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766430166432,
+      "tag": "0002_exotic_bug",
+      "breakpoints": true
     }
   ]
 }
