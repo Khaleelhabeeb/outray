@@ -71,7 +71,6 @@ export class WSHandler {
   }
 
   private async registerTunnelInDatabase(
-    subdomain: string,
     userId: string,
     organizationId: string,
     url: string,
@@ -81,7 +80,6 @@ export class WSHandler {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          subdomain,
           userId,
           organizationId,
           url,
@@ -95,6 +93,33 @@ export class WSHandler {
     } catch (error) {
       console.error("Failed to register tunnel in database:", error);
       return null;
+    }
+  }
+
+  private async verifyCustomDomain(
+    domain: string,
+    organizationId: string,
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      const response = await fetch(
+        `${this.webApiUrl}/domain/verify-ownership`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            domain,
+            organizationId,
+          }),
+        },
+      );
+      const data = (await response.json()) as {
+        valid: boolean;
+        error?: string;
+      };
+      return data;
+    } catch (error) {
+      console.error("Failed to verify custom domain:", error);
+      return { valid: false, error: "Failed to verify custom domain" };
     }
   }
 
@@ -131,6 +156,86 @@ export class WSHandler {
               console.log(
                 `Authenticated organization: ${authResult.organization?.name}`,
               );
+            }
+
+            // Check if custom domain is requested
+            if (message.customDomain) {
+              if (!organizationId) {
+                ws.send(
+                  Protocol.encode({
+                    type: "error",
+                    code: "AUTH_REQUIRED",
+                    message: "Authentication required for custom domains",
+                  }),
+                );
+                ws.close();
+                return;
+              }
+
+              // Verify custom domain belongs to organization
+              const domainCheck = await this.verifyCustomDomain(
+                message.customDomain,
+                organizationId,
+              );
+
+              if (!domainCheck.valid) {
+                ws.send(
+                  Protocol.encode({
+                    type: "error",
+                    code: "DOMAIN_NOT_VERIFIED",
+                    message: domainCheck.error || "Custom domain not verified",
+                  }),
+                );
+                ws.close();
+                return;
+              }
+
+              // Use custom domain as tunnel ID
+              tunnelId = message.customDomain;
+              const tunnelUrl = `https://${message.customDomain}`;
+
+              // Register tunnel in database
+              let dbTunnelId: string | undefined;
+              if (userId && organizationId) {
+                const id = await this.registerTunnelInDatabase(
+                  userId,
+                  organizationId,
+                  tunnelUrl,
+                );
+                if (id) dbTunnelId = id;
+              }
+
+              const registered = await this.router.registerTunnel(
+                tunnelId,
+                ws,
+                {
+                  organizationId,
+                  userId,
+                  dbTunnelId,
+                },
+              );
+
+              if (!registered) {
+                ws.send(
+                  Protocol.encode({
+                    type: "error",
+                    code: "DOMAIN_IN_USE",
+                    message: "Custom domain is already in use",
+                  }),
+                );
+                ws.close();
+                return;
+              }
+
+              ws.send(
+                Protocol.encode({
+                  type: "tunnel_opened",
+                  tunnelId,
+                  url: tunnelUrl,
+                }),
+              );
+              console.log(`Tunnel opened with custom domain: ${tunnelId}`);
+              return;
             }
 
             let requestedSubdomain = message.subdomain;
@@ -249,7 +354,6 @@ export class WSHandler {
             let dbTunnelId: string | undefined;
             if (userId && organizationId) {
               const id = await this.registerTunnelInDatabase(
-                tunnelId,
                 userId,
                 organizationId,
                 tunnelUrl,
