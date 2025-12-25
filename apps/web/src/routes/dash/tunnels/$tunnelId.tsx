@@ -1,6 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { appClient } from "../../../lib/app-client";
 import {
   ArrowLeft,
@@ -49,12 +54,24 @@ function formatBytes(bytes: number): string {
 
 function TunnelDetailView() {
   const { tunnelId } = Route.useParams();
-  const [activeTab, setActiveTab] = useState<"overview" | "requests" | "security" | "settings">("overview");
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "requests" | "security" | "settings"
+  >("overview");
   const [timeRange, setTimeRange] = useState("24h");
 
   const { data: tunnelData, isLoading: tunnelLoading } = useQuery({
     queryKey: ["tunnel", tunnelId],
     queryFn: () => appClient.tunnels.get(tunnelId),
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: () => appClient.tunnels.stop(tunnelId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tunnels"] });
+      void queryClient.invalidateQueries({ queryKey: ["tunnel", tunnelId] });
+    },
   });
 
   const {
@@ -72,10 +89,13 @@ function TunnelDetailView() {
     placeholderData: keepPreviousData,
   });
 
-  const tunnel = tunnelData && "tunnel" in tunnelData ? tunnelData.tunnel : null;
+  const tunnel =
+    tunnelData && "tunnel" in tunnelData ? tunnelData.tunnel : null;
   const stats = statsData && "stats" in statsData ? statsData.stats : null;
-  const chartData = statsData && "chartData" in statsData ? statsData.chartData : [];
-  const requests = statsData && "requests" in statsData ? statsData.requests : [];
+  const chartData =
+    statsData && "chartData" in statsData ? statsData.chartData : [];
+  const requests =
+    statsData && "requests" in statsData ? statsData.requests : [];
 
   if (tunnelLoading || statsLoading) {
     return (
@@ -95,8 +115,13 @@ function TunnelDetailView() {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-gray-500">
         <AlertTriangle size={48} className="mb-4 opacity-50" />
-        <h2 className="text-xl font-medium text-white mb-2">Tunnel Not Found</h2>
-        <p>The tunnel you are looking for does not exist or you don't have access to it.</p>
+        <h2 className="text-xl font-medium text-white mb-2">
+          Tunnel Not Found
+        </h2>
+        <p>
+          The tunnel you are looking for does not exist or you don't have access
+          to it.
+        </p>
         <Link to="/dash/tunnels" className="mt-4 text-accent hover:underline">
           Back to Tunnels
         </Link>
@@ -116,20 +141,26 @@ function TunnelDetailView() {
           </Link>
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-1">
-              <h2 className="text-2xl font-bold text-white tracking-tight">{tunnel.name || tunnel.id}</h2>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
-                tunnel.isOnline 
-                  ? "bg-green-500/10 text-green-500 border-green-500/20" 
-                  : "bg-red-500/10 text-red-500 border-red-500/20"
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${tunnel.isOnline ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                {tunnel.name || tunnel.id}
+              </h2>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
+                  tunnel.isOnline
+                    ? "bg-green-500/10 text-green-500 border-green-500/20"
+                    : "bg-red-500/10 text-red-500 border-red-500/20"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${tunnel.isOnline ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+                />
                 {tunnel.isOnline ? "Online" : "Offline"}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Globe size={14} />
               <span className="font-mono">{tunnel.url}</span>
-              <button 
+              <button
                 className="hover:text-white transition-colors"
                 onClick={() => navigator.clipboard.writeText(tunnel.url)}
               >
@@ -146,9 +177,17 @@ function TunnelDetailView() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-colors text-sm font-medium">
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (confirm("Are you sure you want to stop this tunnel?")) {
+                  stopMutation.mutate();
+                }
+              }}
+              disabled={stopMutation.isPending || !tunnel.isOnline}
+            >
               <Power size={16} />
-              Stop
+              {stopMutation.isPending ? "Stopping..." : "Stop"}
             </button>
           </div>
         </div>
@@ -180,21 +219,53 @@ function TunnelDetailView() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Total Requests", value: stats?.totalRequests.toLocaleString() || "0", change: null, trend: "neutral" },
-              { label: "Avg. Duration", value: `${Math.round(stats?.avgDuration || 0)}ms`, change: null, trend: "neutral" },
-              { label: "Bandwidth", value: formatBytes(stats?.totalBandwidth || 0), change: null, trend: "neutral" },
-              { label: "Error Rate", value: `${(stats?.errorRate || 0).toFixed(2)}%`, change: null, trend: stats?.errorRate && stats.errorRate > 0 ? "down" : "neutral" },
+              {
+                label: "Total Requests",
+                value: stats?.totalRequests.toLocaleString() || "0",
+                change: null,
+                trend: "neutral",
+              },
+              {
+                label: "Avg. Duration",
+                value: `${Math.round(stats?.avgDuration || 0)}ms`,
+                change: null,
+                trend: "neutral",
+              },
+              {
+                label: "Bandwidth",
+                value: formatBytes(stats?.totalBandwidth || 0),
+                change: null,
+                trend: "neutral",
+              },
+              {
+                label: "Error Rate",
+                value: `${(stats?.errorRate || 0).toFixed(2)}%`,
+                change: null,
+                trend:
+                  stats?.errorRate && stats.errorRate > 0 ? "down" : "neutral",
+              },
             ].map((stat, i) => (
-              <div key={i} className="bg-white/2 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all group">
-                <div className="text-sm text-gray-500 font-medium mb-2">{stat.label}</div>
+              <div
+                key={i}
+                className="bg-white/2 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all group"
+              >
+                <div className="text-sm text-gray-500 font-medium mb-2">
+                  {stat.label}
+                </div>
                 <div className="flex items-end justify-between">
-                  <div className="text-2xl font-semibold text-white">{stat.value}</div>
+                  <div className="text-2xl font-semibold text-white">
+                    {stat.value}
+                  </div>
                   {stat.change && (
-                    <div className={`text-xs font-medium px-2 py-1 rounded-lg ${
-                      stat.trend === "up" ? "bg-green-500/10 text-green-500" : 
-                      stat.trend === "down" ? "bg-red-500/10 text-red-500" : 
-                      "bg-gray-500/10 text-gray-400"
-                    }`}>
+                    <div
+                      className={`text-xs font-medium px-2 py-1 rounded-lg ${
+                        stat.trend === "up"
+                          ? "bg-green-500/10 text-green-500"
+                          : stat.trend === "down"
+                            ? "bg-red-500/10 text-red-500"
+                            : "bg-gray-500/10 text-gray-400"
+                      }`}
+                    >
                       {stat.change}
                     </div>
                   )}
@@ -210,7 +281,9 @@ function TunnelDetailView() {
             )}
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-medium text-white">Traffic Overview</h3>
+                <h3 className="text-lg font-medium text-white">
+                  Traffic Overview
+                </h3>
                 <p className="text-sm text-gray-500">Requests over time</p>
               </div>
               <div className="flex bg-white/5 rounded-lg p-1">
@@ -234,17 +307,35 @@ function TunnelDetailView() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                     <defs>
-                      <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#FFA62B" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#FFA62B" stopOpacity={0} />
+                      <linearGradient
+                        id="colorRequests"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#FFA62B"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#FFA62B"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis 
-                      dataKey="time" 
-                      stroke="#666" 
-                      fontSize={12} 
-                      tickLine={false} 
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="time"
+                      stroke="#666"
+                      fontSize={12}
+                      tickLine={false}
                       axisLine={false}
                       interval="preserveStartEnd"
                       minTickGap={30}
@@ -269,10 +360,10 @@ function TunnelDetailView() {
                         }
                       }}
                     />
-                    <YAxis 
-                      stroke="#666" 
-                      fontSize={12} 
-                      tickLine={false} 
+                    <YAxis
+                      stroke="#666"
+                      fontSize={12}
+                      tickLine={false}
                       axisLine={false}
                       tickFormatter={(value) => `${value}`}
                     />
@@ -315,32 +406,46 @@ function TunnelDetailView() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white/2 border border-white/5 rounded-2xl p-6">
-              <h3 className="text-lg font-medium text-white mb-4">Tunnel Configuration</h3>
+              <h3 className="text-lg font-medium text-white mb-4">
+                Tunnel Configuration
+              </h3>
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Region</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    Region
+                  </div>
                   <div className="flex items-center gap-2 text-white">
                     <span className="text-lg">🇺🇸</span>
                     US East (N. Virginia)
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Protocol</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    Protocol
+                  </div>
                   <div className="text-white font-mono">HTTP/2</div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Client Version</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    Client Version
+                  </div>
                   <div className="text-white font-mono">v1.2.4</div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Created At</div>
-                  <div className="text-white font-mono">{new Date(tunnel.createdAt).toLocaleDateString()}</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    Created At
+                  </div>
+                  <div className="text-white font-mono">
+                    {new Date(tunnel.createdAt).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
-              <h3 className="text-lg font-medium text-white mb-4">Quick Actions</h3>
+              <h3 className="text-lg font-medium text-white mb-4">
+                Quick Actions
+              </h3>
               <div className="space-y-3">
                 <button className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-sm text-gray-300 hover:text-white group">
                   <span className="flex items-center gap-2">
@@ -370,7 +475,10 @@ function TunnelDetailView() {
         <div className="space-y-4">
           <div className="flex items-center gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                size={16}
+              />
               <input
                 type="text"
                 placeholder="Search requests..."
@@ -402,40 +510,64 @@ function TunnelDetailView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                {requests.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                      No requests found
-                    </td>
-                  </tr>
-                ) : (
-                  requests.map((req) => (
-                    <tr key={req.id} className="hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                          req.status >= 500 ? "bg-red-500/10 text-red-500" :
-                          req.status >= 400 ? "bg-orange-500/10 text-orange-500" :
-                          req.status >= 300 ? "bg-blue-500/10 text-blue-500" :
-                          "bg-green-500/10 text-green-500"
-                        }`}>
-                          {req.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-white">{req.method}</td>
-                      <td className="px-6 py-4 text-gray-300 truncate max-w-50" title={req.path}>{req.path}</td>
-                      <td className="px-6 py-4 text-gray-500">{new Date(req.time).toLocaleTimeString()}</td>
-                      <td className="px-6 py-4 text-gray-300">{req.duration}ms</td>
-                      <td className="px-6 py-4 text-gray-500">{formatBytes(req.size)}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all">
-                          <MoreVertical size={16} />
-                        </button>
+                  {requests.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        No requests found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    requests.map((req) => (
+                      <tr
+                        key={req.id}
+                        className="hover:bg-white/5 transition-colors group"
+                      >
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2 py-1 rounded-md text-xs font-medium ${
+                              req.status >= 500
+                                ? "bg-red-500/10 text-red-500"
+                                : req.status >= 400
+                                  ? "bg-orange-500/10 text-orange-500"
+                                  : req.status >= 300
+                                    ? "bg-blue-500/10 text-blue-500"
+                                    : "bg-green-500/10 text-green-500"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-white">
+                          {req.method}
+                        </td>
+                        <td
+                          className="px-6 py-4 text-gray-300 truncate max-w-50"
+                          title={req.path}
+                        >
+                          {req.path}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {new Date(req.time).toLocaleTimeString()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-300">
+                          {req.duration}ms
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {formatBytes(req.size)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all">
+                            <MoreVertical size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -468,8 +600,12 @@ function TunnelDetailView() {
                     <UserCheck size={20} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-white">Basic Authentication</div>
-                    <div className="text-xs text-gray-500">Require username and password</div>
+                    <div className="text-sm font-medium text-white">
+                      Basic Authentication
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Require username and password
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -489,8 +625,12 @@ function TunnelDetailView() {
                     <Key size={20} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-white">API Key Protection</div>
-                    <div className="text-xs text-gray-500">Require x-api-key header</div>
+                    <div className="text-sm font-medium text-white">
+                      API Key Protection
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Require x-api-key header
+                    </div>
                   </div>
                 </div>
                 <div className="w-10 h-5 bg-white/10 rounded-full relative cursor-pointer">
@@ -504,8 +644,12 @@ function TunnelDetailView() {
                     <Shield size={20} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-white">IP Whitelisting</div>
-                    <div className="text-xs text-gray-500">Restrict access to specific IPs</div>
+                    <div className="text-sm font-medium text-white">
+                      IP Whitelisting
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Restrict access to specific IPs
+                    </div>
                   </div>
                 </div>
                 <div className="w-10 h-5 bg-white/10 rounded-full relative cursor-pointer">
@@ -516,7 +660,9 @@ function TunnelDetailView() {
           </div>
 
           <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
-            <h3 className="text-lg font-medium text-white mb-4">IP Access Logs</h3>
+            <h3 className="text-lg font-medium text-white mb-4">
+              IP Access Logs
+            </h3>
             <div className="overflow-hidden rounded-xl border border-white/5">
               <table className="w-full text-left text-sm">
                 <thead className="bg-white/5 text-gray-400 font-medium">
@@ -529,20 +675,39 @@ function TunnelDetailView() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {[
-                    { ip: "192.168.1.1", loc: "🇺🇸 US", time: "2m ago", status: "Allowed" },
-                    { ip: "10.0.0.5", loc: "🇩🇪 DE", time: "15m ago", status: "Blocked" },
-                    { ip: "172.16.0.1", loc: "🇬🇧 UK", time: "1h ago", status: "Allowed" },
+                    {
+                      ip: "192.168.1.1",
+                      loc: "🇺🇸 US",
+                      time: "2m ago",
+                      status: "Allowed",
+                    },
+                    {
+                      ip: "10.0.0.5",
+                      loc: "🇩🇪 DE",
+                      time: "15m ago",
+                      status: "Blocked",
+                    },
+                    {
+                      ip: "172.16.0.1",
+                      loc: "🇬🇧 UK",
+                      time: "1h ago",
+                      status: "Allowed",
+                    },
                   ].map((log, i) => (
                     <tr key={i} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3 font-mono text-gray-300">{log.ip}</td>
+                      <td className="px-4 py-3 font-mono text-gray-300">
+                        {log.ip}
+                      </td>
                       <td className="px-4 py-3 text-gray-300">{log.loc}</td>
                       <td className="px-4 py-3 text-gray-500">{log.time}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          log.status === "Allowed" 
-                            ? "bg-green-500/10 text-green-500" 
-                            : "bg-red-500/10 text-red-500"
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            log.status === "Allowed"
+                              ? "bg-green-500/10 text-green-500"
+                              : "bg-red-500/10 text-red-500"
+                          }`}
+                        >
                           {log.status}
                         </span>
                       </td>
@@ -558,7 +723,9 @@ function TunnelDetailView() {
       {activeTab === "settings" && (
         <div className="space-y-6 max-w-4xl mx-auto">
           <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
-            <h3 className="text-lg font-medium text-white mb-6">General Settings</h3>
+            <h3 className="text-lg font-medium text-white mb-6">
+              General Settings
+            </h3>
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">
@@ -575,7 +742,10 @@ function TunnelDetailView() {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  This will update your tunnel URL to <span className="font-mono text-gray-400">https://new-name.outray.app</span>
+                  This will update your tunnel URL to{" "}
+                  <span className="font-mono text-gray-400">
+                    https://new-name.outray.app
+                  </span>
                 </p>
               </div>
 
@@ -599,15 +769,22 @@ function TunnelDetailView() {
                 <AlertTriangle size={24} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-medium text-white mb-1">Danger Zone</h3>
+                <h3 className="text-lg font-medium text-white mb-1">
+                  Danger Zone
+                </h3>
                 <p className="text-sm text-gray-400 mb-6">
-                  Once you delete a tunnel, there is no going back. Please be certain.
+                  Once you delete a tunnel, there is no going back. Please be
+                  certain.
                 </p>
-                
+
                 <div className="flex items-center justify-between p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
                   <div>
-                    <div className="text-sm font-medium text-white">Delete Tunnel</div>
-                    <div className="text-xs text-gray-500">Permanently remove this tunnel and all its data</div>
+                    <div className="text-sm font-medium text-white">
+                      Delete Tunnel
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Permanently remove this tunnel and all its data
+                    </div>
                   </div>
                   <button className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors text-sm font-medium">
                     <Trash2 size={16} />
