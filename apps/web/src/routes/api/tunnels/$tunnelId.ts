@@ -70,46 +70,6 @@ export const Route = createFileRoute("/api/tunnels/$tunnelId")({
           },
         });
       },
-      DELETE: async ({ request, params }) => {
-        const session = await auth.api.getSession({ headers: request.headers });
-        if (!session) {
-          return json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        const { tunnelId } = params;
-
-        const [tunnel] = await db
-          .select()
-          .from(tunnels)
-          .where(eq(tunnels.id, tunnelId));
-
-        if (!tunnel) {
-          return json({ error: "Tunnel not found" }, { status: 404 });
-        }
-
-        if (tunnel.organizationId) {
-          const organizations = await auth.api.listOrganizations({
-            headers: request.headers,
-          });
-          const hasAccess = organizations.find(
-            (org) => org.id === tunnel.organizationId,
-          );
-          if (!hasAccess) {
-            return json({ error: "Unauthorized" }, { status: 403 });
-          }
-        } else if (tunnel.userId !== session.user.id) {
-          return json({ error: "Unauthorized" }, { status: 403 });
-        }
-
-        // Hard delete the tunnel record (cascade will delete subdomains)
-        await db.delete(tunnels).where(eq(tunnels.id, tunnel.id));
-
-        // Note: The tunnel server will continue to serve the tunnel if it's currently connected
-        // because it manages the Redis key separately. This is fine - the tunnel stays active
-        // until the client disconnects. Once deleted from DB, a new client can't register it.
-
-        return json({ message: "Tunnel deleted" });
-      },
     },
   },
 });
