@@ -23,6 +23,7 @@ export interface TunnelMetadata {
   userId?: string;
   dbTunnelId?: string;
   bandwidthLimit?: number;
+  retentionDays?: number;
 }
 
 export class TunnelRouter {
