@@ -70,8 +70,6 @@ async function handleSubscriptionCreated(subscription: any) {
         ? new Date(subscription.currentPeriodEnd)
         : null,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
-      extraMembers: 0,
-      extraDomains: 0,
     });
 
     console.log(
