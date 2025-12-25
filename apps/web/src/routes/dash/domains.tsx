@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { appClient } from "../../lib/app-client";
 import { useAppStore } from "../../lib/store";
+import { getPlanLimits } from "../../lib/subscription-plans";
+import axios from "axios";
 
 export const Route = createFileRoute("/dash/domains")({
   component: DomainsView,
@@ -26,7 +28,19 @@ function DomainsView() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery(
+    {
+      queryKey: ["subscription", activeOrgId],
+      queryFn: async () => {
+        if (!activeOrgId) return null;
+        const response = await axios.get(`/api/subscriptions/${activeOrgId}`);
+        return response.data;
+      },
+      enabled: !!activeOrgId,
+    },
+  );
+
+  const { data, isLoading: isLoadingDomains } = useQuery({
     queryKey: ["domains", activeOrgId],
     queryFn: () => {
       if (!activeOrgId) throw new Error("No active organization");
@@ -34,6 +48,8 @@ function DomainsView() {
     },
     enabled: !!activeOrgId,
   });
+
+  const isLoading = isLoadingDomains || isLoadingSubscription;
 
   const createMutation = useMutation({
     mutationFn: async (domain: string) => {
@@ -110,6 +126,24 @@ function DomainsView() {
   };
 
   const domains = data && "domains" in data ? data.domains : [];
+  const subscription = subscriptionData?.subscription;
+  const currentPlan = subscription?.plan || "free";
+  const planLimits = getPlanLimits(currentPlan as any);
+
+  const currentDomainCount = domains.length;
+  const domainLimit = planLimits.maxDomains;
+  const isAtLimit = domainLimit !== -1 && currentDomainCount >= domainLimit;
+  const isUnlimited = domainLimit === -1;
+
+  const handleAddDomainClick = () => {
+    if (isAtLimit) {
+      alert(
+        `You've reached your domain limit (${domainLimit} domains). Upgrade your plan to add more domains.`,
+      );
+      return;
+    }
+    setIsCreating(true);
+  };
 
   if (isLoading) {
     return (
@@ -149,17 +183,55 @@ function DomainsView() {
         <div>
           <h1 className="text-2xl font-medium text-white">Custom Domains</h1>
           <p className="text-white/40 mt-1">
-            Connect your own domains to your tunnels
+            Connect your own domains to your tunnels · {currentDomainCount} /{" "}
+            {isUnlimited ? "∞" : domainLimit} domains
           </p>
         </div>
         <button
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-full hover:bg-white/90 transition-colors font-medium"
+          onClick={handleAddDomainClick}
+          disabled={isAtLimit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors ${
+            isAtLimit
+              ? "bg-white/10 text-gray-400 cursor-not-allowed"
+              : "bg-white text-black hover:bg-white/90"
+          }`}
         >
           <Plus className="w-4 h-4" />
           Add Domain
         </button>
       </div>
+
+      {/* Limit Warning */}
+      {isAtLimit && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-yellow-500">
+              Domain limit reached
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              You've reached your plan's limit of {domainLimit} custom domains.
+              {currentPlan === "ray" && (
+                <>
+                  {" "}
+                  Go to{" "}
+                  <a
+                    href="/dash/billing"
+                    className="text-yellow-500 hover:underline"
+                  >
+                    Billing
+                  </a>{" "}
+                  to add more domain slots or upgrade to Beam for unlimited
+                  domains.
+                </>
+              )}
+              {currentPlan === "free" && (
+                <> Upgrade to a paid plan to add custom domains.</>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {isCreating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
