@@ -79,13 +79,18 @@ async function sampleActiveTunnels() {
 
     console.log("Active tunnels:", totalCount);
 
+    // Format date as YYYY-MM-DD HH:mm:ss for ClickHouse DateTime
+    // toISOString() returns "2023-12-26T12:00:00.000Z"
+    // We want "2023-12-26 12:00:00"
+    const formattedTs = ts.toISOString().slice(0, 19).replace("T", " ");
+
     // Insert into ClickHouse
     try {
       await clickhouse.insert({
         table: "active_tunnel_snapshots",
         values: [
           {
-            ts: ts,
+            ts: formattedTs,
             active_tunnels: totalCount,
           },
         ],
