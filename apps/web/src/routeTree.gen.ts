@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashRouteImport } from './routes/dash'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashIndexRouteImport } from './routes/dash/index'
 import { Route as InvitationsAcceptRouteImport } from './routes/invitations.accept'
@@ -52,6 +53,7 @@ import { Route as ApiCliExchangeRouteImport } from './routes/api/cli/exchange'
 import { Route as ApiCliCompleteRouteImport } from './routes/api/cli/complete'
 import { Route as ApiCheckoutPolarRouteImport } from './routes/api/checkout/polar'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAdminStatsRouteImport } from './routes/api/admin/stats'
 import { Route as ApiTunnelsTunnelIdStopRouteImport } from './routes/api/tunnels/$tunnelId.stop'
 import { Route as ApiDomainsDomainIdVerifyRouteImport } from './routes/api/domains/$domainId.verify'
 import { Route as ApiCliLoginStatusRouteImport } from './routes/api/cli/login/status'
@@ -69,6 +71,11 @@ const LoginRoute = LoginRouteImport.update({
 const DashRoute = DashRouteImport.update({
   id: '/dash',
   path: '/dash',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -275,6 +282,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminStatsRoute = ApiAdminStatsRouteImport.update({
+  id: '/api/admin/stats',
+  path: '/api/admin/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTunnelsTunnelIdStopRoute = ApiTunnelsTunnelIdStopRouteImport.update({
   id: '/stop',
   path: '/stop',
@@ -294,6 +306,7 @@ const ApiCliLoginStatusRoute = ApiCliLoginStatusRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/dash': typeof DashRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -312,6 +325,7 @@ export interface FileRoutesByFullPath {
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/dash/': typeof DashIndexRoute
+  '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/checkout/polar': typeof ApiCheckoutPolarRoute
   '/api/cli/complete': typeof ApiCliCompleteRoute
@@ -342,6 +356,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
@@ -359,6 +374,7 @@ export interface FileRoutesByTo {
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/dash': typeof DashIndexRoute
+  '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/checkout/polar': typeof ApiCheckoutPolarRoute
   '/api/cli/complete': typeof ApiCliCompleteRoute
@@ -390,6 +406,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/dash': typeof DashRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -408,6 +425,7 @@ export interface FileRoutesById {
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/dash/': typeof DashIndexRoute
+  '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/checkout/polar': typeof ApiCheckoutPolarRoute
   '/api/cli/complete': typeof ApiCliCompleteRoute
@@ -440,6 +458,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/dash'
     | '/login'
     | '/onboarding'
@@ -458,6 +477,7 @@ export interface FileRouteTypes {
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/dash/'
+    | '/api/admin/stats'
     | '/api/auth/$'
     | '/api/checkout/polar'
     | '/api/cli/complete'
@@ -488,6 +508,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/login'
     | '/onboarding'
     | '/api/auth-tokens'
@@ -505,6 +526,7 @@ export interface FileRouteTypes {
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/dash'
+    | '/api/admin/stats'
     | '/api/auth/$'
     | '/api/checkout/polar'
     | '/api/cli/complete'
@@ -535,6 +557,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/dash'
     | '/login'
     | '/onboarding'
@@ -553,6 +576,7 @@ export interface FileRouteTypes {
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/dash/'
+    | '/api/admin/stats'
     | '/api/auth/$'
     | '/api/checkout/polar'
     | '/api/cli/complete'
@@ -584,6 +608,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   DashRoute: typeof DashRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -593,6 +618,7 @@ export interface RootRouteChildren {
   CliLoginRoute: typeof CliLoginRoute
   InternalDomainCheckRoute: typeof InternalDomainCheckRoute
   InvitationsAcceptRoute: typeof InvitationsAcceptRoute
+  ApiAdminStatsRoute: typeof ApiAdminStatsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCheckoutPolarRoute: typeof ApiCheckoutPolarRoute
   ApiCliCompleteRoute: typeof ApiCliCompleteRoute
@@ -637,6 +663,13 @@ declare module '@tanstack/react-router' {
       path: '/dash'
       fullPath: '/dash'
       preLoaderRoute: typeof DashRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -919,6 +952,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/stats': {
+      id: '/api/admin/stats'
+      path: '/api/admin/stats'
+      fullPath: '/api/admin/stats'
+      preLoaderRoute: typeof ApiAdminStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tunnels/$tunnelId/stop': {
       id: '/api/tunnels/$tunnelId/stop'
       path: '/stop'
@@ -1021,6 +1061,7 @@ const ApiTunnelsTunnelIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   DashRoute: DashRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
@@ -1030,6 +1071,7 @@ const rootRouteChildren: RootRouteChildren = {
   CliLoginRoute: CliLoginRoute,
   InternalDomainCheckRoute: InternalDomainCheckRoute,
   InvitationsAcceptRoute: InvitationsAcceptRoute,
+  ApiAdminStatsRoute: ApiAdminStatsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCheckoutPolarRoute: ApiCheckoutPolarRoute,
   ApiCliCompleteRoute: ApiCliCompleteRoute,
