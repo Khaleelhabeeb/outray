@@ -54,35 +54,24 @@ async function sampleActiveTunnels() {
       const [nextCursor, keys] = await redis.scan(
         cursor,
         "MATCH",
-        "org:*:active_tunnels",
+        "tunnel:online:*",
         "COUNT",
-        100,
+        1000,
       );
       cursor = nextCursor;
-
-      if (keys.length === 0) continue;
-
-      // Pipeline: Get counts for each org
-      const pipeline = redis.pipeline();
-      for (const key of keys) {
-        pipeline.zcard(key);
-      }
-      const results = await pipeline.exec();
-
-      if (!results) continue;
-
-      for (const [err, count] of results as [Error | null, number][]) {
-        if (err) continue;
-        totalCount += count;
-      }
+      totalCount += keys.length;
     } while (cursor !== "0");
 
     console.log("Active tunnels:", totalCount);
 
-    // Format date as YYYY-MM-DD HH:mm:ss for ClickHouse DateTime
-    // toISOString() returns "2023-12-26T12:00:00.000Z"
-    // We want "2023-12-26 12:00:00"
-    const formattedTs = ts.toISOString().slice(0, 19).replace("T", " ");
+    // Format timestamp in server local time to avoid timezone offsets in ClickHouse
+    const year = ts.getFullYear();
+    const month = String(ts.getMonth() + 1).padStart(2, "0");
+    const day = String(ts.getDate()).padStart(2, "0");
+    const hours = String(ts.getHours()).padStart(2, "0");
+    const minutes = String(ts.getMinutes()).padStart(2, "0");
+    const seconds = String(ts.getSeconds()).padStart(2, "0");
+    const formattedTs = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
     // Insert into ClickHouse
     try {
