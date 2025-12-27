@@ -26,14 +26,13 @@ export function SubdomainHeader({
       </div>
       <button
         onClick={onAddClick}
-        disabled={isAtLimit}
-        className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors ${
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-white/5 ${
           isAtLimit
             ? "bg-white/10 text-gray-400 cursor-not-allowed"
             : "bg-white hover:bg-gray-200 text-black"
         }`}
       >
-        <Plus size={16} />
+        <Plus size={18} />
         Reserve Subdomain
       </button>
     </div>

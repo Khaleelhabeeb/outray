@@ -26,14 +26,13 @@ export function DomainHeader({
       </div>
       <button
         onClick={onAddClick}
-        disabled={isAtLimit}
-        className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors ${
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-white/5 ${
           isAtLimit
             ? "bg-white/10 text-gray-400 cursor-not-allowed"
             : "bg-white text-black hover:bg-white/90"
         }`}
       >
-        <Plus className="w-4 h-4" />
+        <Plus size={18} />
         Add Domain
       </button>
     </div>

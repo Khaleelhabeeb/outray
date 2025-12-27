@@ -35,8 +35,8 @@ export const SUBSCRIPTION_PLANS = {
     polarProductId: process.env.POLAR_BEAM_PRODUCT_ID,
     features: {
       maxTunnels: 10,
-      maxDomains: -1, // Unlimited
-      maxSubdomains: 10,
+      maxDomains: 10,
+      maxSubdomains: 20,
       maxMembers: 5,
       bandwidthPerMonth: 1024 * 1024 * 1024 * 50, // 50GB
       retentionDays: 30,

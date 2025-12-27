@@ -33,8 +33,8 @@ export function SubdomainLimitWarning({
               >
                 Billing
               </a>{" "}
-              to add more subdomain slots or upgrade to Beam for more
-              subdomains.
+              upgrade to Beam for up to 20 reserved subdomains or Pulse for
+              unlimited subdomains.
             </>
           )}
           {currentPlan === "free" && (

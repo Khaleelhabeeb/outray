@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Globe } from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 import { appClient } from "../../lib/app-client";
 import { useAppStore } from "../../lib/store";
 import { getPlanLimits } from "../../lib/subscription-plans";
@@ -10,6 +10,8 @@ import { DomainHeader } from "../../components/domains/domain-header";
 import { DomainLimitWarning } from "../../components/domains/domain-limit-warning";
 import { CreateDomainModal } from "../../components/domains/create-domain-modal";
 import { DomainCard } from "../../components/domains/domain-card";
+import { LimitModal } from "../../components/limit-modal";
+import { AlertModal } from "../../components/alert-modal";
 
 export const Route = createFileRoute("/dash/domains")({
   component: DomainsView,
@@ -20,7 +22,19 @@ function DomainsView() {
   const activeOrgId = selectedOrganizationId;
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "error" | "info" | "success";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "error",
+  });
 
   const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery(
     {
@@ -81,7 +95,12 @@ function DomainsView() {
     },
     onSuccess: (data) => {
       if ("error" in data) {
-        alert(data.error);
+        setAlertState({
+          isOpen: true,
+          title: "Verification Failed",
+          message: data.error,
+          type: "error",
+        });
       } else {
         queryClient.invalidateQueries({ queryKey: ["domains"] });
       }
@@ -100,9 +119,7 @@ function DomainsView() {
 
   const handleAddDomainClick = () => {
     if (isAtLimit) {
-      alert(
-        `You've reached your domain limit (${domainLimit} domains). Upgrade your plan to add more domains.`,
-      );
+      setIsLimitModalOpen(true);
       return;
     }
     setIsCreating(true);
@@ -165,6 +182,24 @@ function DomainsView() {
         setError={setError}
       />
 
+      <LimitModal
+        isOpen={isLimitModalOpen}
+        onClose={() => setIsLimitModalOpen(false)}
+        title="Domain Limit Reached"
+        description={`You've reached your plan's limit of ${domainLimit} custom domains. Upgrade your plan to add more domains.`}
+        limit={domainLimit}
+        currentPlan={currentPlan}
+        resourceName="Custom Domains"
+      />
+
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={() => setAlertState((prev) => ({ ...prev, isOpen: false }))}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
+
       <div className="grid gap-4">
         {domains.map((domain: any) => (
           <DomainCard
@@ -189,9 +224,10 @@ function DomainsView() {
               URLs.
             </p>
             <button
-              onClick={() => setIsCreating(true)}
-              className="px-4 py-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors border border-white/5"
+              onClick={handleAddDomainClick}
+              className="px-4 py-2.5 bg-white text-black rounded-xl font-medium hover:bg-gray-200 transition-colors shadow-lg shadow-white/5 flex items-center gap-2 mx-auto"
             >
+              <Plus size={18} />
               Add your first domain
             </button>
           </div>

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Globe } from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 import { appClient } from "../../lib/app-client";
 import { useAppStore } from "../../lib/store";
 import { getPlanLimits } from "../../lib/subscription-plans";
@@ -10,6 +10,7 @@ import { SubdomainHeader } from "../../components/subdomains/subdomain-header";
 import { SubdomainLimitWarning } from "../../components/subdomains/subdomain-limit-warning";
 import { CreateSubdomainModal } from "../../components/subdomains/create-subdomain-modal";
 import { SubdomainCard } from "../../components/subdomains/subdomain-card";
+import { LimitModal } from "../../components/limit-modal";
 
 export const Route = createFileRoute("/dash/subdomains")({
   component: SubdomainsView,
@@ -20,6 +21,7 @@ function SubdomainsView() {
   const activeOrgId = selectedOrganizationId;
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery(
@@ -87,9 +89,7 @@ function SubdomainsView() {
 
   const handleAddSubdomainClick = () => {
     if (isAtLimit) {
-      alert(
-        `You've reached your subdomain limit (${subdomainLimit} subdomains). Upgrade your plan to add more subdomains.`,
-      );
+      setIsLimitModalOpen(true);
       return;
     }
     setIsCreating(true);
@@ -152,6 +152,16 @@ function SubdomainsView() {
         setError={setError}
       />
 
+      <LimitModal
+        isOpen={isLimitModalOpen}
+        onClose={() => setIsLimitModalOpen(false)}
+        title="Subdomain Limit Reached"
+        description={`You've reached your plan's limit of ${subdomainLimit} reserved subdomains. Upgrade your plan to reserve more subdomains.`}
+        limit={subdomainLimit}
+        currentPlan={currentPlan}
+        resourceName="Reserved Subdomains"
+      />
+
       {subdomains.length === 0 ? (
         <div className="text-center py-12 text-gray-500 bg-white/2 rounded-2xl border border-white/5">
           <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -165,8 +175,9 @@ function SubdomainsView() {
           </p>
           <button
             onClick={handleAddSubdomainClick}
-            className="px-4 py-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors border border-white/5"
+            className="px-4 py-2.5 bg-white text-black rounded-xl font-medium hover:bg-gray-200 transition-colors shadow-lg shadow-white/5 flex items-center gap-2 mx-auto"
           >
+            <Plus size={18} />
             Reserve your first subdomain
           </button>
         </div>

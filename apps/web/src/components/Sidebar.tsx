@@ -65,7 +65,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     organizations.find((org) => org.id === selectedOrganizationId) ||
     organizations[0];
 
-  const NAV_ICON_SIZE = 16;
+  const NAV_ICON_SIZE = 14;
 
   const navSections = [
     {

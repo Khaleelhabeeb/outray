@@ -8,6 +8,7 @@ import {
   Trash2,
   Check,
 } from "lucide-react";
+import { ConfirmModal } from "../confirm-modal";
 
 interface Domain {
   id: string;
@@ -30,6 +31,21 @@ export function DomainCard({
   isVerifying,
 }: DomainCardProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive: boolean;
+    confirmText: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    isDestructive: false,
+    confirmText: "",
+  });
 
   const handleCopy = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -234,9 +250,14 @@ export function DomainCard({
       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity self-start">
         <button
           onClick={() => {
-            if (confirm("Are you sure you want to delete this domain?")) {
-              onDelete(domain.id);
-            }
+            setConfirmState({
+              isOpen: true,
+              title: "Delete Domain",
+              message: "Are you sure you want to delete this domain?",
+              onConfirm: () => onDelete(domain.id),
+              isDestructive: true,
+              confirmText: "Delete",
+            });
           }}
           className="p-2 hover:bg-red-500/10 text-white/20 hover:text-red-400 rounded-lg transition-colors"
           title="Remove domain"
@@ -244,6 +265,16 @@ export function DomainCard({
           <Trash2 className="w-5 h-5" />
         </button>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        isDestructive={confirmState.isDestructive}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }

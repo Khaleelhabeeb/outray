@@ -14,6 +14,9 @@ import { useAppStore } from "../../lib/store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPlanLimits } from "../../lib/subscription-plans";
 import axios from "axios";
+import { AlertModal } from "../../components/alert-modal";
+import { LimitModal } from "../../components/limit-modal";
+import { ConfirmModal } from "../../components/confirm-modal";
 
 export const Route = createFileRoute("/dash/members")({
   component: MembersView,
@@ -27,6 +30,33 @@ function MembersView() {
   const [inviteRole, setInviteRole] = useState<"member" | "admin" | "owner">(
     "member",
   );
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "error" | "info" | "success";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "error",
+  });
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive: boolean;
+    confirmText: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    isDestructive: false,
+    confirmText: "Confirm",
+  });
 
   const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery(
     {
@@ -98,7 +128,12 @@ function MembersView() {
       setIsInviteModalOpen(false);
     },
     onError: (error: Error) => {
-      alert(error.message || "Failed to invite member");
+      setAlertState({
+        isOpen: true,
+        title: "Invitation Failed",
+        message: error.message || "Failed to invite member",
+        type: "error",
+      });
     },
   });
 
@@ -133,7 +168,12 @@ function MembersView() {
           context.previousInvitations,
         );
       }
-      alert(error.message || "Failed to cancel invitation");
+      setAlertState({
+        isOpen: true,
+        title: "Cancellation Failed",
+        message: error.message || "Failed to cancel invitation",
+        type: "error",
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({
@@ -174,7 +214,12 @@ function MembersView() {
           context.previousMembers,
         );
       }
-      alert(error.message || "Failed to remove member");
+      setAlertState({
+        isOpen: true,
+        title: "Removal Failed",
+        message: error.message || "Failed to remove member",
+        type: "error",
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({
@@ -189,13 +234,25 @@ function MembersView() {
   };
 
   const cancelInvitation = async (invitationId: string) => {
-    if (!confirm("Are you sure you want to cancel this invitation?")) return;
-    cancelInvitationMutation.mutate(invitationId);
+    setConfirmState({
+      isOpen: true,
+      title: "Cancel Invitation",
+      message: "Are you sure you want to cancel this invitation?",
+      onConfirm: () => cancelInvitationMutation.mutate(invitationId),
+      isDestructive: true,
+      confirmText: "Cancel Invitation",
+    });
   };
 
   const removeMember = async (memberId: string) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
-    removeMemberMutation.mutate(memberId);
+    setConfirmState({
+      isOpen: true,
+      title: "Remove Member",
+      message: "Are you sure you want to remove this member?",
+      onConfirm: () => removeMemberMutation.mutate(memberId),
+      isDestructive: true,
+      confirmText: "Remove Member",
+    });
   };
 
   const members = membersData || [];
@@ -216,9 +273,7 @@ function MembersView() {
 
   const handleInviteClick = () => {
     if (isAtLimit) {
-      alert(
-        `You've reached your member limit (${memberLimit} members). Upgrade your plan or purchase additional member slots to invite more people.`,
-      );
+      setIsLimitModalOpen(true);
       return;
     }
     setIsInviteModalOpen(true);
@@ -272,8 +327,7 @@ function MembersView() {
         </div>
         <button
           onClick={handleInviteClick}
-          disabled={isAtLimit}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-white/5 ${
             isAtLimit
               ? "bg-white/10 text-gray-400 cursor-not-allowed"
               : "bg-white text-black hover:bg-gray-200"
@@ -479,6 +533,34 @@ function MembersView() {
           </div>
         </div>
       )}
+
+      <LimitModal
+        isOpen={isLimitModalOpen}
+        onClose={() => setIsLimitModalOpen(false)}
+        title="Member Limit Reached"
+        description={`You've reached your plan's limit of ${memberLimit} members. Upgrade your plan to invite more members.`}
+        limit={memberLimit}
+        currentPlan={currentPlan}
+        resourceName="Team Members"
+      />
+
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={() => setAlertState((prev) => ({ ...prev, isOpen: false }))}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
+
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        isDestructive={confirmState.isDestructive}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }

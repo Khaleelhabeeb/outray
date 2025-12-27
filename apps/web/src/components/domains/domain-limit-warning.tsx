@@ -32,7 +32,8 @@ export function DomainLimitWarning({
               >
                 Billing
               </a>{" "}
-              to add more domain slots or upgrade to Beam for unlimited domains.
+              upgrade to Beam for up to 10 custom domains or Pulse for unlimited
+              domains.
             </>
           )}
           {currentPlan === "free" && (

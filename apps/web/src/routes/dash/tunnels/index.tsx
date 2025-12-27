@@ -18,6 +18,7 @@ import { useAppStore } from "../../../lib/store";
 import { getPlanLimits } from "../../../lib/subscription-plans";
 import axios from "axios";
 import { NewTunnelModal } from "../../../components/new-tunnel-modal";
+import { LimitModal } from "../../../components/limit-modal";
 
 export const Route = createFileRoute("/dash/tunnels/")({
   component: TunnelsView,
@@ -29,6 +30,7 @@ function TunnelsView() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isNewTunnelModalOpen, setIsNewTunnelModalOpen] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
 
   const { selectedOrganizationId } = useAppStore();
   const activeOrgId = selectedOrganizationId;
@@ -119,9 +121,7 @@ function TunnelsView() {
 
   const handleNewTunnelClick = () => {
     if (isAtLimit) {
-      alert(
-        `You've reached your tunnel limit (${tunnelLimit} tunnels). Upgrade your plan to create more tunnels.`,
-      );
+      setIsLimitModalOpen(true);
       return;
     }
     setIsNewTunnelModalOpen(true);
@@ -391,6 +391,16 @@ function TunnelsView() {
       <NewTunnelModal
         isOpen={isNewTunnelModalOpen}
         onClose={() => setIsNewTunnelModalOpen(false)}
+      />
+
+      <LimitModal
+        isOpen={isLimitModalOpen}
+        onClose={() => setIsLimitModalOpen(false)}
+        title="Tunnel Limit Reached"
+        description={`You've reached your plan's limit of ${tunnelLimit} active tunnels. Upgrade your plan to create more tunnels.`}
+        limit={tunnelLimit}
+        currentPlan={currentPlan}
+        resourceName="Active Tunnels"
       />
     </div>
   );

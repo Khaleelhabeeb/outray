@@ -10,6 +10,8 @@ import {
 import { initiateCheckout, POLAR_PRODUCT_IDS } from "../../lib/polar";
 import axios from "axios";
 import { authClient } from "../../lib/auth-client";
+import { useState } from "react";
+import { AlertModal } from "../../components/alert-modal";
 
 export const Route = createFileRoute("/dash/billing")({
   component: BillingView,
@@ -23,6 +25,17 @@ export const Route = createFileRoute("/dash/billing")({
 function BillingView() {
   const { selectedOrganizationId } = useAppStore();
   const { success } = Route.useSearch();
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "error" | "success" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["subscription", selectedOrganizationId],
@@ -50,13 +63,23 @@ function BillingView() {
 
   const handleCheckout = async (plan: "ray" | "beam" | "pulse") => {
     if (!selectedOrganizationId || !session?.user) {
-      alert("Please sign in to upgrade your plan");
+      setAlertState({
+        isOpen: true,
+        title: "Authentication Required",
+        message: "Please sign in to upgrade your plan",
+        type: "error",
+      });
       return;
     }
 
     const productId = POLAR_PRODUCT_IDS[plan];
     if (!productId) {
-      alert("Product ID not configured. Please contact support.");
+      setAlertState({
+        isOpen: true,
+        title: "Configuration Error",
+        message: "Product ID not configured. Please contact support.",
+        type: "error",
+      });
       return;
     }
 
@@ -71,7 +94,12 @@ function BillingView() {
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error("Checkout error:", error);
-      alert("Failed to initiate checkout. Please try again.");
+      setAlertState({
+        isOpen: true,
+        title: "Checkout Failed",
+        message: "Failed to initiate checkout. Please try again.",
+        type: "error",
+      });
     }
   };
 
@@ -258,6 +286,14 @@ function BillingView() {
           </div>
         </>
       )}
+
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={() => setAlertState((prev) => ({ ...prev, isOpen: false }))}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   );
 }

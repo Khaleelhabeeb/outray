@@ -28,6 +28,7 @@ import {
 import { useState } from "react";
 import { BandwidthUsage } from "../../components/sidebar/bandwidth-usage";
 import { NewTunnelModal } from "../../components/new-tunnel-modal";
+import { LimitModal } from "../../components/limit-modal";
 
 export const Route = createFileRoute("/dash/")({
   component: OverviewView,
@@ -55,6 +56,7 @@ function formatBytes(bytes: number): string {
 
 function OverviewView() {
   const [isNewTunnelModalOpen, setIsNewTunnelModalOpen] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [timeRange, setTimeRange] = useState("24h");
   const { selectedOrganizationId } = useAppStore();
   const activeOrganization = selectedOrganizationId;
@@ -96,6 +98,7 @@ function OverviewView() {
     queryKey: ["tunnels", activeOrganization],
     queryFn: () => {
       if (!activeOrganization) throw new Error("No active organization");
+
       return appClient.tunnels.list(activeOrganization);
     },
     enabled: !!activeOrganization,
@@ -112,9 +115,7 @@ function OverviewView() {
 
   const handleNewTunnelClick = () => {
     if (isAtLimit) {
-      alert(
-        `You've reached your tunnel limit (${tunnelLimit} tunnels). Upgrade your plan to create more tunnels.`,
-      );
+      setIsLimitModalOpen(true);
       return;
     }
     setIsNewTunnelModalOpen(true);
@@ -415,6 +416,16 @@ function OverviewView() {
       <NewTunnelModal
         isOpen={isNewTunnelModalOpen}
         onClose={() => setIsNewTunnelModalOpen(false)}
+      />
+
+      <LimitModal
+        isOpen={isLimitModalOpen}
+        onClose={() => setIsLimitModalOpen(false)}
+        title="Tunnel Limit Reached"
+        description={`You've reached your plan's limit of ${tunnelLimit} active tunnels. Upgrade your plan to create more tunnels.`}
+        limit={tunnelLimit}
+        currentPlan={currentPlan}
+        resourceName="Active Tunnels"
       />
     </div>
   );
