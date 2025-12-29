@@ -4,6 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
+import mdx from "fumadocs-mdx/vite";
+import * as MdxConfig from "./source.config";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,6 +16,10 @@ export default defineConfig({
     nitro(),
     viteReact(),
     tailwindcss(),
+    mdx(MdxConfig),
+    tsconfigPaths({
+      projects: ["./tsconfig.json"],
+    }),
   ],
   server: {
     allowedHosts: true,

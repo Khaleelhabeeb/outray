@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../index.css?url";
+import { RootProvider } from "fumadocs-ui/provider/tanstack";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +53,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <RootProvider>{children}</RootProvider>
         <Scripts />
       </body>
     </html>

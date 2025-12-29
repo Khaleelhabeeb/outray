@@ -21,7 +21,12 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    "paths": {
+      "fumadocs-mdx:collections/*": [".source/*"],
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "source.config.ts"]
 }

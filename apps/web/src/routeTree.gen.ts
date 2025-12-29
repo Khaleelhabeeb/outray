@@ -17,8 +17,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrgSlugIndexRouteImport } from './routes/$orgSlug/index'
 import { Route as InvitationsAcceptRouteImport } from './routes/invitations.accept'
 import { Route as InternalDomainCheckRouteImport } from './routes/internal/domain-check'
+import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as CliLoginRouteImport } from './routes/cli.login'
 import { Route as ApiSubdomainsRouteImport } from './routes/api/subdomains'
+import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiRequestsRouteImport } from './routes/api/requests'
 import { Route as ApiAuthTokensRouteImport } from './routes/api/auth-tokens'
 import { Route as OrgSlugSubdomainsRouteImport } from './routes/$orgSlug/subdomains'
@@ -101,6 +103,11 @@ const InternalDomainCheckRoute = InternalDomainCheckRouteImport.update({
   path: '/internal/domain-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsSplatRoute = DocsSplatRouteImport.update({
+  id: '/docs/$',
+  path: '/docs/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CliLoginRoute = CliLoginRouteImport.update({
   id: '/cli/login',
   path: '/cli/login',
@@ -109,6 +116,11 @@ const CliLoginRoute = CliLoginRouteImport.update({
 const ApiSubdomainsRoute = ApiSubdomainsRouteImport.update({
   id: '/api/subdomains',
   path: '/api/subdomains',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRequestsRoute = ApiRequestsRouteImport.update({
@@ -338,8 +350,10 @@ export interface FileRoutesByFullPath {
   '/$orgSlug/subdomains': typeof OrgSlugSubdomainsRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
   '/api/requests': typeof ApiRequestsRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/cli/login': typeof CliLoginRoute
+  '/docs/$': typeof DocsSplatRoute
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/$orgSlug/': typeof OrgSlugIndexRoute
@@ -389,8 +403,10 @@ export interface FileRoutesByTo {
   '/$orgSlug/subdomains': typeof OrgSlugSubdomainsRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
   '/api/requests': typeof ApiRequestsRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/cli/login': typeof CliLoginRoute
+  '/docs/$': typeof DocsSplatRoute
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/$orgSlug': typeof OrgSlugIndexRoute
@@ -443,8 +459,10 @@ export interface FileRoutesById {
   '/$orgSlug/subdomains': typeof OrgSlugSubdomainsRoute
   '/api/auth-tokens': typeof ApiAuthTokensRoute
   '/api/requests': typeof ApiRequestsRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/subdomains': typeof ApiSubdomainsRouteWithChildren
   '/cli/login': typeof CliLoginRoute
+  '/docs/$': typeof DocsSplatRoute
   '/internal/domain-check': typeof InternalDomainCheckRoute
   '/invitations/accept': typeof InvitationsAcceptRoute
   '/$orgSlug/': typeof OrgSlugIndexRoute
@@ -498,8 +516,10 @@ export interface FileRouteTypes {
     | '/$orgSlug/subdomains'
     | '/api/auth-tokens'
     | '/api/requests'
+    | '/api/search'
     | '/api/subdomains'
     | '/cli/login'
+    | '/docs/$'
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/$orgSlug/'
@@ -549,8 +569,10 @@ export interface FileRouteTypes {
     | '/$orgSlug/subdomains'
     | '/api/auth-tokens'
     | '/api/requests'
+    | '/api/search'
     | '/api/subdomains'
     | '/cli/login'
+    | '/docs/$'
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/$orgSlug'
@@ -602,8 +624,10 @@ export interface FileRouteTypes {
     | '/$orgSlug/subdomains'
     | '/api/auth-tokens'
     | '/api/requests'
+    | '/api/search'
     | '/api/subdomains'
     | '/cli/login'
+    | '/docs/$'
     | '/internal/domain-check'
     | '/invitations/accept'
     | '/$orgSlug/'
@@ -649,8 +673,10 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   ApiAuthTokensRoute: typeof ApiAuthTokensRoute
   ApiRequestsRoute: typeof ApiRequestsRoute
+  ApiSearchRoute: typeof ApiSearchRoute
   ApiSubdomainsRoute: typeof ApiSubdomainsRouteWithChildren
   CliLoginRoute: typeof CliLoginRoute
+  DocsSplatRoute: typeof DocsSplatRoute
   InternalDomainCheckRoute: typeof InternalDomainCheckRoute
   InvitationsAcceptRoute: typeof InvitationsAcceptRoute
   ApiAdminLoginRoute: typeof ApiAdminLoginRoute
@@ -736,6 +762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalDomainCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/$': {
+      id: '/docs/$'
+      path: '/docs/$'
+      fullPath: '/docs/$'
+      preLoaderRoute: typeof DocsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cli/login': {
       id: '/cli/login'
       path: '/cli/login'
@@ -748,6 +781,13 @@ declare module '@tanstack/react-router' {
       path: '/api/subdomains'
       fullPath: '/api/subdomains'
       preLoaderRoute: typeof ApiSubdomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/requests': {
@@ -1139,8 +1179,10 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   ApiAuthTokensRoute: ApiAuthTokensRoute,
   ApiRequestsRoute: ApiRequestsRoute,
+  ApiSearchRoute: ApiSearchRoute,
   ApiSubdomainsRoute: ApiSubdomainsRouteWithChildren,
   CliLoginRoute: CliLoginRoute,
+  DocsSplatRoute: DocsSplatRoute,
   InternalDomainCheckRoute: InternalDomainCheckRoute,
   InvitationsAcceptRoute: InvitationsAcceptRoute,
   ApiAdminLoginRoute: ApiAdminLoginRoute,
