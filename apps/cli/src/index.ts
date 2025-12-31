@@ -468,12 +468,13 @@ async function main() {
           configPath = args[configIndex + 1];
         }
       }
-    } else {
-      configPath = path.join(process.cwd(), "config.toml");
     }
 
+    const defaultConfigPath = path.join(process.cwd(), "config.toml");
+    const tomlConfigPath = configPath || defaultConfigPath;
+
     try {
-      const parsedConfig = TomlConfigParser.loadTomlConfig(configPath || "");
+      const parsedConfig = TomlConfigParser.loadTomlConfig(tomlConfigPath);
       console.log(chalk.green(`✓ Config file is valid`));
       console.log(chalk.cyan(`\nFound ${parsedConfig.tunnels.length} tunnel(s):\n`));
       for (const tunnel of parsedConfig.tunnels) {
