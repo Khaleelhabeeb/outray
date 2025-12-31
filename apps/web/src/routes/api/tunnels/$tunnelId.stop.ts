@@ -41,20 +41,35 @@ export const Route = createFileRoute("/api/tunnels/$tunnelId/stop")({
         }
 
         // Kill the tunnel connection if it's active
-        // We use the tunnel URL hostname as the ID for the tunnel server
-        let tunnelHostname = tunnel.url;
+        // For HTTP tunnels: use full hostname (subdomain.outray.app)
+        // For TCP/UDP tunnels: use just the subdomain
+        let tunnelIdentifier = tunnel.url;
         try {
-          const urlObj = new URL(
-            tunnel.url.startsWith("http")
-              ? tunnel.url
-              : `https://${tunnel.url}`,
-          );
-          tunnelHostname = urlObj.hostname;
+          // Handle different URL formats
+          // HTTP: https://subdomain.outray.app
+          // TCP/UDP: tcp://subdomain.outray.app:port or udp://subdomain.outray.app:port
+          const protocol = tunnel.protocol || "http";
+
+          if (protocol === "tcp" || protocol === "udp") {
+            // For TCP/UDP, extract just the subdomain
+            const urlObj = new URL(tunnel.url.replace(/^(tcp|udp):/, "https:"));
+            const hostname = urlObj.hostname;
+            // Extract subdomain from hostname (e.g., "pretty-cake" from "pretty-cake.outray.app")
+            tunnelIdentifier = hostname.split(".")[0];
+          } else {
+            // For HTTP, use full hostname
+            const urlObj = new URL(
+              tunnel.url.startsWith("http")
+                ? tunnel.url
+                : `https://${tunnel.url}`,
+            );
+            tunnelIdentifier = urlObj.hostname;
+          }
         } catch (e) {
           // ignore
         }
 
-        await redis.publish("tunnel:control", `kill:${tunnelHostname}`);
+        await redis.publish("tunnel:control", `kill:${tunnelIdentifier}`);
 
         return json({ message: "Tunnel stopped" });
       },
