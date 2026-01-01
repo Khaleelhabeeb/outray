@@ -56,7 +56,7 @@ export class OutRayClient {
   }
 
   private connect(): void {
-    console.log(chalk.cyan("✨ Connecting to OutRay..."));
+    console.log(chalk.cyan("Connecting to OutRay..."));
 
     this.ws = new WebSocket(this.serverUrl);
 
@@ -64,7 +64,7 @@ export class OutRayClient {
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
     this.ws.on("close", (code, reason) => this.handleClose(code, reason));
     this.ws.on("error", (error) => {
-      console.log(chalk.red(`❌ WebSocket error: ${error.message}`));
+      console.log(chalk.red(`WebSocket error: ${error.message}`));
     });
     this.ws.on("pong", () => {
       // Received pong, connection is alive
@@ -72,7 +72,7 @@ export class OutRayClient {
   }
 
   private handleOpen(): void {
-    console.log(chalk.green(`🔌 Linked to your local port ${this.localPort}`));
+    console.log(chalk.green(`Linked to your local port ${this.localPort}`));
     this.startPing();
 
     const handshake = encodeMessage({
@@ -98,8 +98,10 @@ export class OutRayClient {
         // Reset forceTakeover flag after successful connection
         // Keep subdomainConflictHandled to detect takeovers
         this.forceTakeover = false;
-        console.log(chalk.magenta(`🌐 Tunnel ready: ${message.url}`));
-        console.log(chalk.yellow("🥹 Don't close this or I'll cry softly."));
+        console.log(chalk.magenta(`Tunnel ready: ${message.url}`));
+        console.log(
+          chalk.yellow("Keep this running to keep your tunnel active."),
+        );
       } else if (message.type === "error") {
         if (message.code === "SUBDOMAIN_IN_USE") {
           if (this.assignedUrl) {
@@ -119,7 +121,7 @@ export class OutRayClient {
             // This means we were taken over by another tunnel
             console.log(
               chalk.yellow(
-                `\n⚠️  Your tunnel was taken over by another connection.`,
+                `\nYour tunnel was taken over by another connection.`,
               ),
             );
             console.log(
@@ -244,7 +246,7 @@ export class OutRayClient {
     } catch (error) {
       console.warn(
         chalk.yellow(
-          `⚠️  Unable to determine tunnel subdomain from url '${url}': ${error}`,
+          `Unable to determine tunnel subdomain from url '${url}': ${error}`,
         ),
       );
       return null;
@@ -270,7 +272,7 @@ export class OutRayClient {
   private async handleSubdomainConflict(): Promise<void> {
     console.log(
       chalk.yellow(
-        `\n⚠️  Subdomain "${this.requestedSubdomain}" is currently in use.`,
+        `\nSubdomain "${this.requestedSubdomain}" is currently in use.`,
       ),
     );
 
@@ -287,19 +289,19 @@ export class OutRayClient {
     });
 
     if (response.action === "takeover") {
-      console.log(chalk.cyan("🔄 Taking over the existing tunnel..."));
+      console.log(chalk.cyan("Taking over the existing tunnel..."));
       this.subdomain = this.requestedSubdomain;
       this.shouldReconnect = true;
       this.forceTakeover = true;
       this.connect();
     } else if (response.action === "random") {
-      console.log(chalk.cyan("🎲 Opening tunnel with a random subdomain..."));
+      console.log(chalk.cyan("Opening tunnel with a random subdomain..."));
       this.subdomain = undefined;
       this.shouldReconnect = true;
       this.forceTakeover = false;
       this.connect();
     } else {
-      console.log(chalk.cyan("👋 Goodbye!"));
+      console.log(chalk.cyan("Goodbye!"));
       this.stop();
       process.exit(0);
     }
@@ -312,12 +314,12 @@ export class OutRayClient {
     const reasonStr = reason?.toString() || "";
 
     if (code === 1000 && reasonStr === "Tunnel stopped by user") {
-      console.log(chalk.red("\n🛑 Tunnel stopped by user via dashboard."));
+      console.log(chalk.red("\nTunnel stopped by user via dashboard."));
       this.stop();
       process.exit(0);
     }
 
-    console.log(chalk.yellow("😵 Disconnected from OutRay. Retrying in 2s…"));
+    console.log(chalk.yellow("Disconnected from OutRay. Retrying in 2s…"));
 
     this.reconnectTimeout = setTimeout(() => {
       this.connect();
