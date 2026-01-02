@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 import { db } from "../../../../db";
 import { tunnels } from "../../../../db/app-schema";
 import { requireOrgFromSlug } from "../../../../lib/org";
 
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-  database: process.env.CLICKHOUSE_DATABASE || "default",
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const Route = createFileRoute("/api/$orgSlug/stats/protocol")({
@@ -44,221 +46,170 @@ export const Route = createFileRoute("/api/$orgSlug/stats/protocol")({
           return json({ error: "Unauthorized" }, { status: 403 });
         }
 
-        let interval = "24 HOUR";
+        let intervalValue = "24 hours";
         if (timeRange === "1h") {
-          interval = "1 HOUR";
+          intervalValue = "1 hour";
         } else if (timeRange === "7d") {
-          interval = "7 DAY";
+          intervalValue = "7 days";
         } else if (timeRange === "30d") {
-          interval = "30 DAY";
+          intervalValue = "30 days";
         }
 
         try {
-          const connectionsResult = await clickhouse.query({
-            query: `
-              SELECT 
-                countIf(event_type = 'connection') as total_connections,
-                uniqExact(connection_id) as unique_connections,
-                uniqExact(concat(client_ip, ':', toString(client_port))) as unique_clients
-              FROM protocol_events
-              WHERE tunnel_id = {tunnelId:String}
-                AND timestamp >= now64() - INTERVAL ${interval}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const connectionsData = (await connectionsResult.json()) as Array<{
-            total_connections: string;
-            unique_connections: string;
-            unique_clients: string;
-          }>;
+          // Connections stats
+          const connectionsResult = await pool.query(
+            `SELECT 
+              COUNT(*) FILTER (WHERE event_type = 'connection') as total_connections,
+              COUNT(DISTINCT connection_id) as unique_connections,
+              COUNT(DISTINCT (client_ip || ':' || client_port::text)) as unique_clients
+            FROM protocol_events
+            WHERE tunnel_id = $1 AND timestamp >= NOW() - $2::interval`,
+            [tunnelId, intervalValue],
+          );
+          const connectionsData = connectionsResult.rows[0];
 
-          const bandwidthResult = await clickhouse.query({
-            query: `
-              SELECT 
-                sum(bytes_in) as total_bytes_in,
-                sum(bytes_out) as total_bytes_out
-              FROM protocol_events
-              WHERE tunnel_id = {tunnelId:String}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const bandwidthData = (await bandwidthResult.json()) as Array<{
-            total_bytes_in: string;
-            total_bytes_out: string;
-          }>;
+          // Bandwidth stats
+          const bandwidthResult = await pool.query(
+            `SELECT 
+              COALESCE(SUM(bytes_in), 0) as total_bytes_in,
+              COALESCE(SUM(bytes_out), 0) as total_bytes_out
+            FROM protocol_events
+            WHERE tunnel_id = $1`,
+            [tunnelId],
+          );
+          const bandwidthData = bandwidthResult.rows[0];
 
-          const packetsResult = await clickhouse.query({
-            query: `
-              SELECT 
-                countIf(event_type = 'data' OR event_type = 'packet') as total_packets,
-                countIf(event_type = 'close') as total_closes
-              FROM protocol_events
-              WHERE tunnel_id = {tunnelId:String}
-                AND timestamp >= now64() - INTERVAL ${interval}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const packetsData = (await packetsResult.json()) as Array<{
-            total_packets: string;
-            total_closes: string;
-          }>;
+          // Packets stats
+          const packetsResult = await pool.query(
+            `SELECT 
+              COUNT(*) FILTER (WHERE event_type IN ('data', 'packet')) as total_packets,
+              COUNT(*) FILTER (WHERE event_type = 'close') as total_closes
+            FROM protocol_events
+            WHERE tunnel_id = $1 AND timestamp >= NOW() - $2::interval`,
+            [tunnelId, intervalValue],
+          );
+          const packetsData = packetsResult.rows[0];
 
-          const durationResult = await clickhouse.query({
-            query: `
-              SELECT avg(duration_ms) as avg_duration_ms
-              FROM protocol_events
-              WHERE tunnel_id = {tunnelId:String}
-                AND event_type = 'close'
-                AND duration_ms > 0
-                AND timestamp >= now64() - INTERVAL ${interval}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const durationData = (await durationResult.json()) as Array<{
-            avg_duration_ms: string;
-          }>;
+          // Duration stats
+          const durationResult = await pool.query(
+            `SELECT AVG(duration_ms) as avg_duration_ms
+            FROM protocol_events
+            WHERE tunnel_id = $1
+              AND event_type = 'close'
+              AND duration_ms > 0
+              AND timestamp >= NOW() - $2::interval`,
+            [tunnelId, intervalValue],
+          );
+          const durationData = durationResult.rows[0];
 
+          // Chart data
           let chartQuery = "";
+          let chartParams: (string | number)[] = [tunnelId];
+
           if (timeRange === "1h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfMinute(now64() - INTERVAL number MINUTE) as time
-                FROM numbers(60)
+                SELECT generate_series(
+                  time_bucket('1 minute', NOW()) - INTERVAL '60 minutes',
+                  time_bucket('1 minute', NOW()),
+                  '1 minute'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.event_type = 'connection') as connections,
-                countIf(e.event_type = 'data' OR e.event_type = 'packet') as packets,
-                sum(e.bytes_in) as bytes_in,
-                sum(e.bytes_out) as bytes_out
+                COUNT(*) FILTER (WHERE e.event_type = 'connection') as connections,
+                COUNT(*) FILTER (WHERE e.event_type IN ('data', 'packet')) as packets,
+                COALESCE(SUM(e.bytes_in), 0) as bytes_in,
+                COALESCE(SUM(e.bytes_out), 0) as bytes_out
               FROM times t
-              LEFT JOIN protocol_events e ON toStartOfMinute(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN protocol_events e ON time_bucket('1 minute', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
           } else if (timeRange === "24h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfHour(now64() - INTERVAL number HOUR) as time
-                FROM numbers(24)
+                SELECT generate_series(
+                  time_bucket('1 hour', NOW()) - INTERVAL '24 hours',
+                  time_bucket('1 hour', NOW()),
+                  '1 hour'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.event_type = 'connection') as connections,
-                countIf(e.event_type = 'data' OR e.event_type = 'packet') as packets,
-                sum(e.bytes_in) as bytes_in,
-                sum(e.bytes_out) as bytes_out
+                COUNT(*) FILTER (WHERE e.event_type = 'connection') as connections,
+                COUNT(*) FILTER (WHERE e.event_type IN ('data', 'packet')) as packets,
+                COALESCE(SUM(e.bytes_in), 0) as bytes_in,
+                COALESCE(SUM(e.bytes_out), 0) as bytes_out
               FROM times t
-              LEFT JOIN protocol_events e ON toStartOfHour(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
-              GROUP BY t.time
-              ORDER BY t.time ASC
-            `;
-          } else if (timeRange === "7d") {
-            chartQuery = `
-              WITH times AS (
-                SELECT toStartOfDay(now64() - INTERVAL number DAY) as time
-                FROM numbers(7)
-              )
-              SELECT 
-                t.time as time,
-                countIf(e.event_type = 'connection') as connections,
-                countIf(e.event_type = 'data' OR e.event_type = 'packet') as packets,
-                sum(e.bytes_in) as bytes_in,
-                sum(e.bytes_out) as bytes_out
-              FROM times t
-              LEFT JOIN protocol_events e ON toStartOfDay(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN protocol_events e ON time_bucket('1 hour', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
           } else {
+            const days = timeRange === "7d" ? 7 : 30;
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfDay(now64() - INTERVAL number DAY) as time
-                FROM numbers(30)
+                SELECT generate_series(
+                  time_bucket('1 day', NOW()) - $2::interval,
+                  time_bucket('1 day', NOW()),
+                  '1 day'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.event_type = 'connection') as connections,
-                countIf(e.event_type = 'data' OR e.event_type = 'packet') as packets,
-                sum(e.bytes_in) as bytes_in,
-                sum(e.bytes_out) as bytes_out
+                COUNT(*) FILTER (WHERE e.event_type = 'connection') as connections,
+                COUNT(*) FILTER (WHERE e.event_type IN ('data', 'packet')) as packets,
+                COALESCE(SUM(e.bytes_in), 0) as bytes_in,
+                COALESCE(SUM(e.bytes_out), 0) as bytes_out
               FROM times t
-              LEFT JOIN protocol_events e ON toStartOfDay(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN protocol_events e ON time_bucket('1 day', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
+            chartParams = [tunnelId, `${days} days`];
           }
 
-          const chartResult = await clickhouse.query({
-            query: chartQuery,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const chartData = (await chartResult.json()) as Array<{
-            time: string;
-            connections: string;
-            packets: string;
-            bytes_in: string;
-            bytes_out: string;
-          }>;
+          const chartResult = await pool.query(chartQuery, chartParams);
+          const chartData = chartResult.rows;
 
-          const recentResult = await clickhouse.query({
-            query: `
-              SELECT 
-                timestamp,
-                event_type,
-                connection_id,
-                client_ip,
-                client_port,
-                bytes_in,
-                bytes_out,
-                duration_ms
-              FROM protocol_events
-              WHERE tunnel_id = {tunnelId:String}
-              ORDER BY timestamp DESC
-              LIMIT 50
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const recentEvents = (await recentResult.json()) as Array<{
-            timestamp: string;
-            event_type: string;
-            connection_id: string;
-            client_ip: string;
-            client_port: number;
-            bytes_in: number;
-            bytes_out: number;
-            duration_ms: number;
-          }>;
+          // Recent events
+          const recentResult = await pool.query(
+            `SELECT 
+              timestamp,
+              event_type,
+              connection_id,
+              client_ip,
+              client_port,
+              bytes_in,
+              bytes_out,
+              duration_ms
+            FROM protocol_events
+            WHERE tunnel_id = $1
+            ORDER BY timestamp DESC
+            LIMIT 50`,
+            [tunnelId],
+          );
+          const recentEvents = recentResult.rows;
 
           return json({
             protocol: tunnel.protocol,
             stats: {
               totalConnections: parseInt(
-                connectionsData[0]?.total_connections || "0",
+                connectionsData?.total_connections || "0",
               ),
               uniqueConnections: parseInt(
-                connectionsData[0]?.unique_connections || "0",
+                connectionsData?.unique_connections || "0",
               ),
-              uniqueClients: parseInt(
-                connectionsData[0]?.unique_clients || "0",
-              ),
-              totalBytesIn: parseInt(bandwidthData[0]?.total_bytes_in || "0"),
-              totalBytesOut: parseInt(bandwidthData[0]?.total_bytes_out || "0"),
-              totalPackets: parseInt(packetsData[0]?.total_packets || "0"),
-              totalCloses: parseInt(packetsData[0]?.total_closes || "0"),
-              avgDurationMs: parseFloat(
-                durationData[0]?.avg_duration_ms || "0",
-              ),
+              uniqueClients: parseInt(connectionsData?.unique_clients || "0"),
+              totalBytesIn: parseInt(bandwidthData?.total_bytes_in || "0"),
+              totalBytesOut: parseInt(bandwidthData?.total_bytes_out || "0"),
+              totalPackets: parseInt(packetsData?.total_packets || "0"),
+              totalCloses: parseInt(packetsData?.total_closes || "0"),
+              avgDurationMs: parseFloat(durationData?.avg_duration_ms || "0"),
             },
             chartData: chartData.map((row) => ({
               time: row.time,

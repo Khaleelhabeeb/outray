@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 
 import { requireOrgFromSlug } from "../../../lib/org";
 
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-  database: process.env.CLICKHOUSE_DATABASE || "default",
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const Route = createFileRoute("/api/$orgSlug/requests")({
@@ -25,18 +27,21 @@ export const Route = createFileRoute("/api/$orgSlug/requests")({
         const limit = parseInt(url.searchParams.get("limit") || "100");
         const search = url.searchParams.get("search");
 
-        let interval = "1 HOUR";
+        let intervalValue = "1 hour";
         if (timeRange === "24h") {
-          interval = "24 HOUR";
+          intervalValue = "24 hours";
         } else if (timeRange === "7d") {
-          interval = "7 DAY";
+          intervalValue = "7 days";
         } else if (timeRange === "30d") {
-          interval = "30 DAY";
+          intervalValue = "30 days";
         }
 
         const organizationId = organization.id;
 
         try {
+          const queryParams: any[] = [organizationId, intervalValue];
+          let paramIndex = 3;
+
           let query = `
               SELECT 
                 timestamp,
@@ -52,34 +57,27 @@ export const Route = createFileRoute("/api/$orgSlug/requests")({
                 client_ip,
                 user_agent
               FROM tunnel_events
-              WHERE organization_id = {organizationId:String}
-                AND timestamp >= now64() - INTERVAL ${interval}
+              WHERE organization_id = $1
+                AND timestamp >= NOW() - $2::interval
           `;
 
-          const queryParams: Record<string, any> = {
-            organizationId,
-            limit,
-          };
-
           if (tunnelId) {
-            query += ` AND tunnel_id = {tunnelId:String}`;
-            queryParams.tunnelId = tunnelId;
+            query += ` AND tunnel_id = $${paramIndex}`;
+            queryParams.push(tunnelId);
+            paramIndex++;
           }
 
           if (search) {
-            query += ` AND (path ILIKE {searchPattern:String} OR method ILIKE {searchPattern:String} OR host ILIKE {searchPattern:String})`;
-            queryParams.searchPattern = `%${search}%`;
+            query += ` AND (path ILIKE $${paramIndex} OR method ILIKE $${paramIndex} OR host ILIKE $${paramIndex})`;
+            queryParams.push(`%${search}%`);
+            paramIndex++;
           }
 
-          query += ` ORDER BY timestamp DESC LIMIT {limit:UInt32}`;
+          query += ` ORDER BY timestamp DESC LIMIT $${paramIndex}`;
+          queryParams.push(limit);
 
-          const requestsResult = await clickhouse.query({
-            query,
-            query_params: queryParams,
-            format: "JSONEachRow",
-          });
-
-          const requests = (await requestsResult.json()) as Array<any>;
+          const requestsResult = await pool.query(query, queryParams);
+          const requests = requestsResult.rows;
 
           return json({
             requests,

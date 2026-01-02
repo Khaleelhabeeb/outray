@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 import { db } from "../../../../db";
 import { tunnels } from "../../../../db/app-schema";
 import { requireOrgFromSlug } from "../../../../lib/org";
 
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-  database: process.env.CLICKHOUSE_DATABASE || "default",
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const Route = createFileRoute("/api/$orgSlug/stats/tunnel")({
@@ -44,109 +46,99 @@ export const Route = createFileRoute("/api/$orgSlug/stats/tunnel")({
           return json({ error: "Unauthorized" }, { status: 403 });
         }
 
-        let interval = "24 HOUR";
+        let intervalValue = "24 hours";
         if (timeRange === "1h") {
-          interval = "1 HOUR";
+          intervalValue = "1 hour";
         } else if (timeRange === "7d") {
-          interval = "7 DAY";
+          intervalValue = "7 days";
         } else if (timeRange === "30d") {
-          interval = "30 DAY";
+          intervalValue = "30 days";
         }
 
         try {
-          const totalRequestsResult = await clickhouse.query({
-            query: `
-              SELECT count() as total
-              FROM tunnel_events
-              WHERE tunnel_id = {tunnelId:String}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const totalRequestsData =
-            (await totalRequestsResult.json()) as Array<{ total: string }>;
-          const totalRequests = parseInt(totalRequestsData[0]?.total || "0");
+          // Total requests
+          const totalRequestsResult = await pool.query(
+            `SELECT COUNT(*) as total FROM tunnel_events WHERE tunnel_id = $1`,
+            [tunnelId],
+          );
+          const totalRequests = parseInt(
+            totalRequestsResult.rows[0]?.total || "0",
+          );
 
-          const durationResult = await clickhouse.query({
-            query: `
-              SELECT avg(request_duration_ms) as avg_duration
-              FROM tunnel_events
-              WHERE tunnel_id = {tunnelId:String}
-                AND timestamp >= now64() - INTERVAL ${interval}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const durationData = (await durationResult.json()) as Array<{
-            avg_duration: string;
-          }>;
-          const avgDuration = parseFloat(durationData[0]?.avg_duration || "0");
+          // Average duration
+          const durationResult = await pool.query(
+            `SELECT AVG(request_duration_ms) as avg_duration
+             FROM tunnel_events
+             WHERE tunnel_id = $1 AND timestamp >= NOW() - $2::interval`,
+            [tunnelId, intervalValue],
+          );
+          const avgDuration = parseFloat(
+            durationResult.rows[0]?.avg_duration || "0",
+          );
 
-          const bandwidthResult = await clickhouse.query({
-            query: `
-              SELECT sum(bytes_in + bytes_out) as total_bytes
-              FROM tunnel_events
-              WHERE tunnel_id = {tunnelId:String}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const bandwidthData = (await bandwidthResult.json()) as Array<{
-            total_bytes: string;
-          }>;
-          const totalBandwidth = parseInt(bandwidthData[0]?.total_bytes || "0");
+          // Total bandwidth
+          const bandwidthResult = await pool.query(
+            `SELECT SUM(bytes_in + bytes_out) as total_bytes
+             FROM tunnel_events WHERE tunnel_id = $1`,
+            [tunnelId],
+          );
+          const totalBandwidth = parseInt(
+            bandwidthResult.rows[0]?.total_bytes || "0",
+          );
 
-          const errorRateResult = await clickhouse.query({
-            query: `
-              SELECT 
-                countIf(status_code >= 400) as errors,
-                count() as total
-              FROM tunnel_events
-              WHERE tunnel_id = {tunnelId:String}
-                AND timestamp >= now64() - INTERVAL ${interval}
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const errorRateData = (await errorRateResult.json()) as Array<{
-            errors: string;
-            total: string;
-          }>;
-          const errorCount = parseInt(errorRateData[0]?.errors || "0");
-          const totalCount = parseInt(errorRateData[0]?.total || "0");
+          // Error rate
+          const errorRateResult = await pool.query(
+            `SELECT 
+               COUNT(*) FILTER (WHERE status_code >= 400) as errors,
+               COUNT(*) as total
+             FROM tunnel_events
+             WHERE tunnel_id = $1 AND timestamp >= NOW() - $2::interval`,
+            [tunnelId, intervalValue],
+          );
+          const errorCount = parseInt(errorRateResult.rows[0]?.errors || "0");
+          const totalCount = parseInt(errorRateResult.rows[0]?.total || "0");
           const errorRate =
             totalCount > 0 ? (errorCount / totalCount) * 100 : 0;
 
+          // Chart data
           let chartQuery = "";
+          let chartParams: (string | number)[] = [tunnelId];
+
           if (timeRange === "1h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfMinute(now64() - INTERVAL number MINUTE) as time
-                FROM numbers(60)
+                SELECT generate_series(
+                  time_bucket('1 minute', NOW()) - INTERVAL '60 minutes',
+                  time_bucket('1 minute', NOW()),
+                  '1 minute'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.tunnel_id = {tunnelId:String}) as requests,
-                avg(e.request_duration_ms) as duration
+                COUNT(e.tunnel_id) as requests,
+                AVG(e.request_duration_ms) as duration
               FROM times t
-              LEFT JOIN tunnel_events e ON toStartOfMinute(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN tunnel_events e ON time_bucket('1 minute', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
           } else if (timeRange === "24h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfHour(now64() - INTERVAL number HOUR) as time
-                FROM numbers(24)
+                SELECT generate_series(
+                  time_bucket('1 hour', NOW()) - INTERVAL '24 hours',
+                  time_bucket('1 hour', NOW()),
+                  '1 hour'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.tunnel_id = {tunnelId:String}) as requests,
-                avg(e.request_duration_ms) as duration
+                COUNT(e.tunnel_id) as requests,
+                AVG(e.request_duration_ms) as duration
               FROM times t
-              LEFT JOIN tunnel_events e ON toStartOfHour(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN tunnel_events e ON time_bucket('1 hour', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
@@ -154,50 +146,44 @@ export const Route = createFileRoute("/api/$orgSlug/stats/tunnel")({
             const days = timeRange === "7d" ? 7 : 30;
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfDay(now64() - INTERVAL number DAY) as time
-                FROM numbers(${days})
+                SELECT generate_series(
+                  time_bucket('1 day', NOW()) - $2::interval,
+                  time_bucket('1 day', NOW()),
+                  '1 day'::interval
+                ) AS time
               )
               SELECT 
                 t.time as time,
-                countIf(e.tunnel_id = {tunnelId:String}) as requests,
-                avg(e.request_duration_ms) as duration
+                COUNT(e.tunnel_id) as requests,
+                AVG(e.request_duration_ms) as duration
               FROM times t
-              LEFT JOIN tunnel_events e ON toStartOfDay(e.timestamp) = t.time
-                AND e.tunnel_id = {tunnelId:String}
+              LEFT JOIN tunnel_events e ON time_bucket('1 day', e.timestamp) = t.time
+                AND e.tunnel_id = $1
               GROUP BY t.time
               ORDER BY t.time ASC
             `;
+            chartParams = [tunnelId, `${days} days`];
           }
 
-          const chartResult = await clickhouse.query({
-            query: chartQuery,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const chartData = (await chartResult.json()) as Array<{
-            time: string;
-            requests: string;
-            duration: string | null;
-          }>;
+          const chartResult = await pool.query(chartQuery, chartParams);
+          const chartData = chartResult.rows;
 
-          const requestsResult = await clickhouse.query({
-            query: `
-              SELECT 
-                timestamp,
-                method,
-                path,
-                status_code,
-                request_duration_ms,
-                bytes_in + bytes_out as size
-              FROM tunnel_events
-              WHERE tunnel_id = {tunnelId:String}
-              ORDER BY timestamp DESC
-              LIMIT 50
-            `,
-            query_params: { tunnelId },
-            format: "JSONEachRow",
-          });
-          const requests = (await requestsResult.json()) as Array<any>;
+          // Recent requests
+          const requestsResult = await pool.query(
+            `SELECT 
+               timestamp,
+               method,
+               path,
+               status_code,
+               request_duration_ms,
+               bytes_in + bytes_out as size
+             FROM tunnel_events
+             WHERE tunnel_id = $1
+             ORDER BY timestamp DESC
+             LIMIT 50`,
+            [tunnelId],
+          );
+          const requests = requestsResult.rows;
 
           return json({
             stats: {

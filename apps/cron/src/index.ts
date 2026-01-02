@@ -1,33 +1,23 @@
-import { redis } from "./lib/redis";
-import { clickhouse } from "./lib/clickhouse";
+// Allow self-signed certificates for Tiger Data cloud
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const CREATE_TABLE_SQL = `
-CREATE TABLE IF NOT EXISTS active_tunnel_snapshots
-(
-    ts DateTime,
-    active_tunnels UInt32
-)
-ENGINE = MergeTree
-PARTITION BY toDate(ts)
-ORDER BY ts
-TTL ts + INTERVAL 90 DAY;
-`;
+import { redis } from "./lib/redis";
+import { pool, execute } from "./lib/tigerdata";
 
 async function connectRedis() {
   await redis.connect();
   console.log("Connected to Redis");
 }
 
-async function connectClickHouse() {
+async function connectTimescaleDB() {
   try {
-    await clickhouse.ping();
-    console.log("Connected to ClickHouse");
-    await clickhouse.command({
-      query: CREATE_TABLE_SQL,
-    });
-    console.log("ClickHouse table ensured");
+    const client = await pool.connect();
+    // Verify connection with a simple query
+    await client.query("SELECT 1");
+    console.log("Connected to TimescaleDB");
+    client.release();
   } catch (error) {
-    console.error("Failed to connect to ClickHouse", error);
+    console.error("Failed to connect to TimescaleDB", error);
     process.exit(1);
   }
 }
@@ -64,30 +54,15 @@ async function sampleActiveTunnels() {
 
     console.log("Active tunnels:", totalCount);
 
-    // Format timestamp in server local time to avoid timezone offsets in ClickHouse
-    const year = ts.getFullYear();
-    const month = String(ts.getMonth() + 1).padStart(2, "0");
-    const day = String(ts.getDate()).padStart(2, "0");
-    const hours = String(ts.getHours()).padStart(2, "0");
-    const minutes = String(ts.getMinutes()).padStart(2, "0");
-    const seconds = String(ts.getSeconds()).padStart(2, "0");
-    const formattedTs = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
-    // Insert into ClickHouse
+    // Insert into TimescaleDB
     try {
-      await clickhouse.insert({
-        table: "active_tunnel_snapshots",
-        values: [
-          {
-            ts: formattedTs,
-            active_tunnels: totalCount,
-          },
-        ],
-        format: "JSONEachRow",
-      });
-      console.log(`Inserted snapshot into ClickHouse: ${totalCount} tunnels`);
+      await execute(
+        "INSERT INTO active_tunnel_snapshots (ts, active_tunnels) VALUES ($1, $2)",
+        [ts, totalCount],
+      );
+      console.log(`Inserted snapshot into TimescaleDB: ${totalCount} tunnels`);
     } catch (error) {
-      console.error("Failed to insert into ClickHouse", error);
+      console.error("Failed to insert into TimescaleDB", error);
     }
   } finally {
     isSampling = false;
@@ -96,7 +71,7 @@ async function sampleActiveTunnels() {
 
 async function start() {
   await connectRedis();
-  await connectClickHouse();
+  await connectTimescaleDB();
 
   // Initial run
   await sampleActiveTunnels();

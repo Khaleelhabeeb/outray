@@ -5,7 +5,8 @@ dist/
 .env
 .env.local
 .output
-# ClickHouse
+
+# Local database files
 data/
 flags/
 format_schemas/
@@ -17,4 +18,3 @@ store/
 tmp/
 user_files/
 uuid
-clickhouse-local.log

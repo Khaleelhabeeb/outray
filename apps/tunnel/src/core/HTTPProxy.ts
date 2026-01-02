@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { TunnelRouter } from "./TunnelRouter";
 import { getBandwidthKey } from "../../../../shared/utils";
-import { logger } from "../lib/clickhouse";
+import { logger } from "../lib/tigerdata";
 import { LogManager } from "./LogManager";
 
 export class HTTPProxy {

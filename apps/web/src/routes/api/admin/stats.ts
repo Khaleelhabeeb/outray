@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 import { redis } from "../../../lib/redis";
 
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL,
-  username: process.env.CLICKHOUSE_USER,
-  password: process.env.CLICKHOUSE_PASSWORD,
-  database: process.env.CLICKHOUSE_DATABASE,
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const Route = createFileRoute("/api/admin/stats")({
@@ -33,63 +35,54 @@ export const Route = createFileRoute("/api/admin/stats")({
         const url = new URL(request.url);
         const period = url.searchParams.get("period") || "24h";
 
-        let intervalUnit = "MINUTE";
-        let intervalValue = 15;
+        let intervalMinutes = 15;
         let points = 96;
 
         switch (period) {
           case "1h":
-            intervalUnit = "MINUTE";
-            intervalValue = 1;
+            intervalMinutes = 1;
             points = 60;
             break;
           case "24h":
-            intervalUnit = "MINUTE";
-            intervalValue = 15;
+            intervalMinutes = 15;
             points = 96;
             break;
           case "7d":
-            intervalUnit = "HOUR";
-            intervalValue = 1;
+            intervalMinutes = 60;
             points = 168;
             break;
           case "30d":
-            intervalUnit = "HOUR";
-            intervalValue = 4;
+            intervalMinutes = 240;
             points = 180;
             break;
         }
 
         const query = `
           WITH times AS (
-            SELECT
-              CAST(
-                toStartOfInterval(
-                  now('UTC') - INTERVAL number * ${intervalValue} ${intervalUnit},
-                  INTERVAL ${intervalValue} ${intervalUnit}
-                ) AS DateTime
-              ) AS time
-            FROM numbers(${points})
+            SELECT generate_series(
+              time_bucket($1::interval, NOW()) - ($1::interval * $2),
+              time_bucket($1::interval, NOW()),
+              $1::interval
+            ) AS time
           )
           SELECT
             t.time as time,
-            max(s.active_tunnels) as active_tunnels
+            COALESCE(MAX(s.active_tunnels), 0) as active_tunnels
           FROM times t
           LEFT JOIN active_tunnel_snapshots s ON
-            toStartOfInterval(s.ts, INTERVAL ${intervalValue} ${intervalUnit}) = t.time
+            time_bucket($1::interval, s.ts) = t.time
           GROUP BY t.time
           ORDER BY t.time ASC
         `;
 
         try {
-          const resultSet = await clickhouse.query({
-            query,
-            format: "JSONEachRow",
-          });
-          const data = await resultSet.json();
-          return json(data);
+          const result = await pool.query(query, [
+            `${intervalMinutes} minutes`,
+            points,
+          ]);
+          return json(result.rows);
         } catch (error) {
-          console.error("ClickHouse query error:", error);
+          console.error("TimescaleDB query error:", error);
           return json({ error: "Failed to fetch stats" }, { status: 500 });
         }
       },

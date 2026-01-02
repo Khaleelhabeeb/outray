@@ -12,7 +12,6 @@
     "db:migrate": "npx drizzle-kit generate && npx drizzle-kit migrate"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.15.0",
     "@polar-sh/sdk": "^0.42.1",
     "@polar-sh/tanstack-start": "^0.4.3",
     "@react-three/drei": "^10.7.7",

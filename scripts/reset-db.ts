@@ -1,24 +1,23 @@
 import "dotenv/config";
-import { createClient } from "@clickhouse/client";
 import pg from "pg";
 
-// PG Setup
+// PG Setup (Main database)
 const pgClient = new pg.Client({
   connectionString: process.env.DATABASE_URL,
 });
 
-// ClickHouse Setup
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-  database: process.env.CLICKHOUSE_DATABASE || "default",
+// TimescaleDB Setup (Analytics)
+const tigerDataClient = new pg.Client({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 async function main() {
   console.log("🗑️  Clearing databases...");
 
-  // Clear Postgres
+  // Clear Postgres (Main database)
   try {
     await pgClient.connect();
     console.log("Connected to Postgres");
@@ -47,21 +46,19 @@ async function main() {
     await pgClient.end();
   }
 
-  // Clear ClickHouse
+  // Clear TimescaleDB (Tiger Data)
   try {
-    console.log("Connected to ClickHouse");
-    await clickhouse.command({
-      query: "TRUNCATE TABLE IF EXISTS tunnel_events",
-    });
-    await clickhouse.command({
-      query: "TRUNCATE TABLE IF EXISTS tunnel_stats_1m",
-    });
-    console.log("✅ ClickHouse tables truncated");
+    await tigerDataClient.connect();
+    console.log("Connected to TimescaleDB (Tiger Data)");
+    await tigerDataClient.query("TRUNCATE TABLE tunnel_events");
+    await tigerDataClient.query("TRUNCATE TABLE protocol_events");
+    await tigerDataClient.query("TRUNCATE TABLE active_tunnel_snapshots");
+    console.log("✅ TimescaleDB tables truncated");
   } catch (e) {
-    console.error("Error clearing ClickHouse:", e);
+    console.error("Error clearing TimescaleDB:", e);
+  } finally {
+    await tigerDataClient.end();
   }
-
-  await clickhouse.close();
 }
 
 main();

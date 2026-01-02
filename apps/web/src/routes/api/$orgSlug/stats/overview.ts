@@ -1,15 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@tanstack/react-start";
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 
 import { redis } from "../../../../lib/redis";
 import { requireOrgFromSlug } from "../../../../lib/org";
 
-const clickhouse = createClient({
-  url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-  database: process.env.CLICKHOUSE_DATABASE || "default",
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.TIGER_DATA_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
@@ -25,126 +27,84 @@ export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
         const organizationId = organization.id;
 
         try {
-          let interval = "24 HOUR";
-          let prevIntervalStart = "48 HOUR";
-          let prevIntervalEnd = "24 HOUR";
+          let intervalValue = "24 hours";
+          let prevIntervalStart = "48 hours";
+          let prevIntervalEnd = "24 hours";
 
           switch (timeRange) {
             case "1h":
-              interval = "1 HOUR";
-              prevIntervalStart = "2 HOUR";
-              prevIntervalEnd = "1 HOUR";
+              intervalValue = "1 hour";
+              prevIntervalStart = "2 hours";
+              prevIntervalEnd = "1 hour";
               break;
             case "7d":
-              interval = "7 DAY";
-              prevIntervalStart = "14 DAY";
-              prevIntervalEnd = "7 DAY";
+              intervalValue = "7 days";
+              prevIntervalStart = "14 days";
+              prevIntervalEnd = "7 days";
               break;
             case "30d":
-              interval = "30 DAY";
-              prevIntervalStart = "60 DAY";
-              prevIntervalEnd = "30 DAY";
+              intervalValue = "30 days";
+              prevIntervalStart = "60 days";
+              prevIntervalEnd = "30 days";
               break;
           }
 
-          const totalRequestsResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT count() FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) +
-                (SELECT count() FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const totalRequestsData =
-            (await totalRequestsResult.json()) as Array<{ total: string }>;
-          const totalRequests = parseInt(totalRequestsData[0]?.total || "0");
-
-          const requestsYesterdayResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT count() FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${prevIntervalStart} AND timestamp < now64() - INTERVAL ${prevIntervalEnd}) +
-                (SELECT count() FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${prevIntervalStart} AND timestamp < now64() - INTERVAL ${prevIntervalEnd}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const requestsYesterdayData =
-            (await requestsYesterdayResult.json()) as Array<{ total: string }>;
-          const requestsYesterday = parseInt(
-            requestsYesterdayData[0]?.total || "0",
+          // Total requests (current period)
+          const totalRequestsResult = await pool.query(
+            `SELECT 
+              (SELECT COUNT(*) FROM tunnel_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval) +
+              (SELECT COUNT(*) FROM protocol_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval) as total`,
+            [organizationId, intervalValue],
+          );
+          const totalRequests = parseInt(
+            totalRequestsResult.rows[0]?.total || "0",
           );
 
-          const recentRequestsResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT count() FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) +
-                (SELECT count() FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const recentRequestsData =
-            (await recentRequestsResult.json()) as Array<{ total: string }>;
-          const recentRequests = parseInt(recentRequestsData[0]?.total || "0");
+          // Requests from previous period
+          const requestsYesterdayResult = await pool.query(
+            `SELECT 
+              (SELECT COUNT(*) FROM tunnel_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval AND timestamp < NOW() - $3::interval) +
+              (SELECT COUNT(*) FROM protocol_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval AND timestamp < NOW() - $3::interval) as total`,
+            [organizationId, prevIntervalStart, prevIntervalEnd],
+          );
+          const requestsYesterday = parseInt(
+            requestsYesterdayResult.rows[0]?.total || "0",
+          );
 
           const requestsChangeRaw =
             requestsYesterday > 0
-              ? ((recentRequests - requestsYesterday) / requestsYesterday) * 100
-              : recentRequests > 0
+              ? ((totalRequests - requestsYesterday) / requestsYesterday) * 100
+              : totalRequests > 0
                 ? 100
                 : 0;
           const requestsChange = Number.isFinite(requestsChangeRaw)
             ? Math.round(requestsChangeRaw * 100) / 100
             : 0;
 
-          const dataTransferResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) +
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const dataTransferData = (await dataTransferResult.json()) as Array<{
-            total: string;
-          }>;
-          const totalBytes = Number(dataTransferData[0]?.total || 0);
+          // Data transfer (current period)
+          const dataTransferResult = await pool.query(
+            `SELECT 
+              COALESCE((SELECT SUM(bytes_in) + SUM(bytes_out) FROM tunnel_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval), 0) +
+              COALESCE((SELECT SUM(bytes_in) + SUM(bytes_out) FROM protocol_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval), 0) as total`,
+            [organizationId, intervalValue],
+          );
+          const totalBytes = Number(dataTransferResult.rows[0]?.total || 0);
 
-          const dataYesterdayResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${prevIntervalStart} AND timestamp < now64() - INTERVAL ${prevIntervalEnd}) +
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${prevIntervalStart} AND timestamp < now64() - INTERVAL ${prevIntervalEnd}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const dataYesterdayData =
-            (await dataYesterdayResult.json()) as Array<{
-              total: string;
-            }>;
-          const bytesYesterday = Number(dataYesterdayData[0]?.total || 0);
-
-          const dataRecentResult = await clickhouse.query({
-            query: `
-              SELECT 
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM tunnel_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) +
-                (SELECT sum(bytes_in) + sum(bytes_out) FROM protocol_events WHERE organization_id = {organizationId:String} AND timestamp >= now64() - INTERVAL ${interval}) as total
-            `,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const dataRecentData = (await dataRecentResult.json()) as Array<{
-            total: string;
-          }>;
-          const bytesRecent = Number(dataRecentData[0]?.total || 0);
+          // Data transfer (previous period)
+          const dataYesterdayResult = await pool.query(
+            `SELECT 
+              COALESCE((SELECT SUM(bytes_in) + SUM(bytes_out) FROM tunnel_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval AND timestamp < NOW() - $3::interval), 0) +
+              COALESCE((SELECT SUM(bytes_in) + SUM(bytes_out) FROM protocol_events WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval AND timestamp < NOW() - $3::interval), 0) as total`,
+            [organizationId, prevIntervalStart, prevIntervalEnd],
+          );
+          const bytesYesterday = Number(
+            dataYesterdayResult.rows[0]?.total || 0,
+          );
 
           const dataTransferChangeRaw =
             bytesYesterday > 0
-              ? ((bytesRecent - bytesYesterday) / bytesYesterday) * 100
-              : bytesRecent > 0
+              ? ((totalBytes - bytesYesterday) / bytesYesterday) * 100
+              : totalBytes > 0
                 ? 100
                 : 0;
           const dataTransferChange = Number.isFinite(dataTransferChangeRaw)
@@ -155,26 +115,30 @@ export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
             `org:${organizationId}:online_tunnels`,
           );
 
+          // Chart data
           let chartQuery = "";
+          let chartParams: (string | number)[] = [organizationId];
+
           if (timeRange === "1h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfMinute(now64() - INTERVAL number MINUTE) as time
-                FROM numbers(60)
+                SELECT generate_series(
+                  time_bucket('1 minute', NOW()) - INTERVAL '60 minutes',
+                  time_bucket('1 minute', NOW()),
+                  '1 minute'::interval
+                ) AS time
               ),
               http_counts AS (
-                SELECT toStartOfMinute(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 minute', timestamp) as time, COUNT(*) as cnt
                 FROM tunnel_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL 1 HOUR
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - INTERVAL '1 hour'
+                GROUP BY 1
               ),
               protocol_counts AS (
-                SELECT toStartOfMinute(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 minute', timestamp) as time, COUNT(*) as cnt
                 FROM protocol_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL 1 HOUR
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - INTERVAL '1 hour'
+                GROUP BY 1
               )
               SELECT 
                 t.time as time,
@@ -187,22 +151,23 @@ export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
           } else if (timeRange === "24h") {
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfHour(now64() - INTERVAL number HOUR) as time
-                FROM numbers(24)
+                SELECT generate_series(
+                  time_bucket('1 hour', NOW()) - INTERVAL '24 hours',
+                  time_bucket('1 hour', NOW()),
+                  '1 hour'::interval
+                ) AS time
               ),
               http_counts AS (
-                SELECT toStartOfHour(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 hour', timestamp) as time, COUNT(*) as cnt
                 FROM tunnel_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL 24 HOUR
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - INTERVAL '24 hours'
+                GROUP BY 1
               ),
               protocol_counts AS (
-                SELECT toStartOfHour(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 hour', timestamp) as time, COUNT(*) as cnt
                 FROM protocol_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL 24 HOUR
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - INTERVAL '24 hours'
+                GROUP BY 1
               )
               SELECT 
                 t.time as time,
@@ -216,22 +181,23 @@ export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
             const days = timeRange === "7d" ? 7 : 30;
             chartQuery = `
               WITH times AS (
-                SELECT toStartOfDay(now64() - INTERVAL number DAY) as time
-                FROM numbers(${days})
+                SELECT generate_series(
+                  time_bucket('1 day', NOW()) - $2::interval,
+                  time_bucket('1 day', NOW()),
+                  '1 day'::interval
+                ) AS time
               ),
               http_counts AS (
-                SELECT toStartOfDay(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 day', timestamp) as time, COUNT(*) as cnt
                 FROM tunnel_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL ${days} DAY
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval
+                GROUP BY 1
               ),
               protocol_counts AS (
-                SELECT toStartOfDay(timestamp) as time, count() as cnt
+                SELECT time_bucket('1 day', timestamp) as time, COUNT(*) as cnt
                 FROM protocol_events
-                WHERE organization_id = {organizationId:String}
-                  AND timestamp >= now64() - INTERVAL ${days} DAY
-                GROUP BY time
+                WHERE organization_id = $1 AND timestamp >= NOW() - $2::interval
+                GROUP BY 1
               )
               SELECT 
                 t.time as time,
@@ -241,17 +207,11 @@ export const Route = createFileRoute("/api/$orgSlug/stats/overview")({
               LEFT JOIN protocol_counts p ON t.time = p.time
               ORDER BY t.time ASC
             `;
+            chartParams = [organizationId, `${days} days`];
           }
 
-          const chartDataResult = await clickhouse.query({
-            query: chartQuery,
-            query_params: { organizationId },
-            format: "JSONEachRow",
-          });
-          const chartData = (await chartDataResult.json()) as Array<{
-            time: string;
-            requests: string;
-          }>;
+          const chartDataResult = await pool.query(chartQuery, chartParams);
+          const chartData = chartDataResult.rows;
 
           return json({
             totalRequests,

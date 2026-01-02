@@ -23,7 +23,7 @@ outray/
 - npm
 - Redis (for tunnel state)
 - PostgreSQL (for user data)
-- ClickHouse (for analytics)
+- Tiger Data / TimescaleDB (for analytics)
 
 ## Getting Started
 
@@ -58,20 +58,12 @@ outray/
    npx drizzle-kit push
    ```
 
-5. **Set up ClickHouse tables**
+5. **Set up Tiger Data (TimescaleDB) tables**
 
-   Run the schema file against your ClickHouse instance:
-
-   ```bash
-   cat deploy/setup_clickhouse.sql | clickhouse-client --multiquery
-   ```
-
-   Or if using ClickHouse Cloud via HTTP:
+   Run the schema file against your TimescaleDB instance:
 
    ```bash
-   curl -sS 'https://your-instance.clickhouse.cloud:8443/' \
-     --user 'default:your_password' \
-     --data-binary @deploy/setup_clickhouse.sql
+   psql "$TIGER_DATA_URL" -f deploy/setup_tigerdata.sql
    ```
 
 6. **Start development servers**

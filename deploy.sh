@@ -9,16 +9,23 @@ REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 REDIS_TUNNEL_TTL_SECONDS="${REDIS_TUNNEL_TTL_SECONDS:-120}"
 REDIS_HEARTBEAT_INTERVAL_MS="${REDIS_HEARTBEAT_INTERVAL_MS:-20000}"
 
-CLICKHOUSE_URL="${CLICKHOUSE_URL}"
-CLICKHOUSE_USER="${CLICKHOUSE_USER}"
-CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}"
-CLICKHOUSE_DATABASE="${CLICKHOUSE_DATABASE}"
+TIGER_DATA_URL="${TIGER_DATA_URL}"
 
 # Tunnel Server Config
 BLUE_PORT=3547
 GREEN_PORT=3548
 BLUE_NAME="outray-blue"
 GREEN_NAME="outray-green"
+
+# Run Tiger Data (TimescaleDB) migrations
+echo "🐯 Running Tiger Data migrations..."
+cd /root/outray
+if [ -n "$TIGER_DATA_URL" ]; then
+  psql "$TIGER_DATA_URL" -f deploy/setup_tigerdata.sql
+  echo "✅ Tiger Data migrations complete."
+else
+  echo "⚠️ TIGER_DATA_URL not set, skipping migrations."
+fi
 
 cd $APP_DIR
 
@@ -64,10 +71,7 @@ PORT=$TARGET_PORT \
 REDIS_URL="$REDIS_URL" \
 REDIS_TUNNEL_TTL_SECONDS="$REDIS_TUNNEL_TTL_SECONDS" \
 REDIS_HEARTBEAT_INTERVAL_MS="$REDIS_HEARTBEAT_INTERVAL_MS" \
-CLICKHOUSE_URL="$CLICKHOUSE_URL" \
-CLICKHOUSE_USER="$CLICKHOUSE_USER" \
-CLICKHOUSE_PASSWORD="$CLICKHOUSE_PASSWORD" \
-CLICKHOUSE_DATABASE="$CLICKHOUSE_DATABASE" \
+TIGER_DATA_URL="$TIGER_DATA_URL" \
 pm2 start dist/server.js --name $TARGET_NAME --update-env --force
 
 # 1.5 Start Internal Check Service
@@ -93,17 +97,11 @@ npm install --production
 # Restart if exists, otherwise start new (prevents duplicates without downtime)
 if pm2 list | grep -q "outray-cron"; then
   REDIS_URL="$REDIS_URL" \
-  CLICKHOUSE_HOST="$CLICKHOUSE_URL" \
-  CLICKHOUSE_USER="$CLICKHOUSE_USER" \
-  CLICKHOUSE_PASSWORD="$CLICKHOUSE_PASSWORD" \
-  CLICKHOUSE_DATABASE="$CLICKHOUSE_DATABASE" \
+  TIGER_DATA_URL="$TIGER_DATA_URL" \
   pm2 restart "outray-cron" --update-env
 else
   REDIS_URL="$REDIS_URL" \
-  CLICKHOUSE_HOST="$CLICKHOUSE_URL" \
-  CLICKHOUSE_USER="$CLICKHOUSE_USER" \
-  CLICKHOUSE_PASSWORD="$CLICKHOUSE_PASSWORD" \
-  CLICKHOUSE_DATABASE="$CLICKHOUSE_DATABASE" \
+  TIGER_DATA_URL="$TIGER_DATA_URL" \
   pm2 start dist/index.js --name "outray-cron"
 fi
 cd $APP_DIR

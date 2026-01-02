@@ -8,7 +8,7 @@ import {
   TCPCloseMessage,
 } from "./Protocol";
 import { generateId, getBandwidthKey } from "../../../../shared/utils";
-import { protocolLogger } from "../lib/clickhouse";
+import { protocolLogger } from "../lib/tigerdata";
 
 interface TCPConnection {
   socket: net.Socket;

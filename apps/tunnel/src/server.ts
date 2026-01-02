@@ -8,7 +8,7 @@ import { TCPProxy } from "./core/TCPProxy";
 import { UDPProxy } from "./core/UDPProxy";
 import { LogManager } from "./core/LogManager";
 import { config } from "./config";
-import { checkClickHouseConnection } from "./lib/clickhouse";
+import { checkTimescaleDBConnection } from "./lib/tigerdata";
 
 const redis = new Redis(config.redisUrl, {
   lazyConnect: true,
@@ -111,7 +111,7 @@ httpServer.on("request", (req, res) => {
 httpServer.listen(config.port, () => {
   console.log(`OutRay Server running on port ${config.port}`);
   console.log(`Base domain: ${config.baseDomain}`);
-  void checkClickHouseConnection();
+  void checkTimescaleDBConnection();
 });
 
 const shutdown = async () => {

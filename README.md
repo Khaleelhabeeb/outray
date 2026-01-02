@@ -37,7 +37,7 @@ outray udp 53
 - Node.js 20+
 - PostgreSQL
 - Redis
-- ClickHouse
+- Tiger Data (TimescaleDB)
 
 ### Project Structure
 

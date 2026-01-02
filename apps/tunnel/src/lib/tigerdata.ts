@@ -1,12 +1,23 @@
-import { createClient } from "@clickhouse/client";
+import pg from "pg";
 import { config } from "../config";
 
-export const clickhouse = createClient({
-  url: config.clickhouse.url,
-  username: config.clickhouse.user,
-  password: config.clickhouse.password,
-  database: config.clickhouse.database,
+const { Pool } = pg;
+
+export const pool = new Pool({
+  connectionString: config.tigerDataUrl,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
+
+export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
+  const result = await pool.query(text, params);
+  return result.rows as T[];
+}
+
+export async function execute(text: string, params?: unknown[]): Promise<void> {
+  await pool.query(text, params);
+}
 
 export interface TunnelEvent {
   timestamp: number;
@@ -24,18 +35,19 @@ export interface TunnelEvent {
   user_agent: string;
 }
 
-export async function checkClickHouseConnection(): Promise<boolean> {
+export async function checkTimescaleDBConnection(): Promise<boolean> {
   try {
-    await clickhouse.ping();
-    console.log("✅ Connected to ClickHouse");
+    const client = await pool.connect();
+    console.log("✅ Connected to TimescaleDB");
+    client.release();
     return true;
   } catch (error) {
-    console.error("❌ Failed to connect to ClickHouse:", error);
+    console.error("❌ Failed to connect to TimescaleDB:", error);
     return false;
   }
 }
 
-class ClickHouseLogger {
+class TimescaleDBLogger {
   private buffer: TunnelEvent[] = [];
   private flushInterval: NodeJS.Timeout;
   private readonly BATCH_SIZE = 1000;
@@ -61,26 +73,53 @@ class ClickHouseLogger {
     this.buffer = [];
 
     try {
-      await clickhouse.insert({
-        table: "tunnel_events",
-        values: events,
-        format: "JSONEachRow",
+      // Build batch insert query
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+
+      events.forEach((event, i) => {
+        const offset = i * 13;
+        placeholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`,
+        );
+        values.push(
+          new Date(event.timestamp),
+          event.tunnel_id,
+          event.organization_id,
+          event.retention_days,
+          event.host,
+          event.method,
+          event.path,
+          event.status_code,
+          event.request_duration_ms,
+          event.bytes_in,
+          event.bytes_out,
+          event.client_ip,
+          event.user_agent,
+        );
       });
+
+      const query = `
+        INSERT INTO tunnel_events (
+          timestamp, tunnel_id, organization_id, retention_days, host, method, 
+          path, status_code, request_duration_ms, bytes_in, bytes_out, client_ip, user_agent
+        ) VALUES ${placeholders.join(", ")}
+      `;
+
+      await execute(query, values);
     } catch (error) {
-      console.error("Failed to flush events to ClickHouse:", error);
-      // Optionally re-queue events or drop them to avoid memory leaks
-      // For now, we drop them to prioritize service stability
+      console.error("Failed to flush events to TimescaleDB:", error);
     }
   }
 
   public async shutdown() {
     clearInterval(this.flushInterval);
     await this.flush();
-    await clickhouse.close();
+    await pool.end();
   }
 }
 
-export const logger = new ClickHouseLogger();
+export const logger = new TimescaleDBLogger();
 
 // Protocol events for TCP/UDP tunnels
 export interface ProtocolEvent {
@@ -224,13 +263,41 @@ class ProtocolLogger {
     this.buffer = [];
 
     try {
-      await clickhouse.insert({
-        table: "protocol_events",
-        values: events,
-        format: "JSONEachRow",
+      // Build batch insert query
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+
+      events.forEach((event, i) => {
+        const offset = i * 12;
+        placeholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12})`,
+        );
+        values.push(
+          new Date(event.timestamp),
+          event.tunnel_id,
+          event.organization_id,
+          event.retention_days,
+          event.protocol,
+          event.event_type,
+          event.connection_id,
+          event.client_ip,
+          event.client_port,
+          event.bytes_in,
+          event.bytes_out,
+          event.duration_ms,
+        );
       });
+
+      const query = `
+        INSERT INTO protocol_events (
+          timestamp, tunnel_id, organization_id, retention_days, protocol, event_type,
+          connection_id, client_ip, client_port, bytes_in, bytes_out, duration_ms
+        ) VALUES ${placeholders.join(", ")}
+      `;
+
+      await execute(query, values);
     } catch (error) {
-      console.error("Failed to flush protocol events to ClickHouse:", error);
+      console.error("Failed to flush protocol events to TimescaleDB:", error);
     }
   }
 
