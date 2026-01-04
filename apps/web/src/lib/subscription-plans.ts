@@ -8,7 +8,7 @@ export const SUBSCRIPTION_PLANS = {
       maxDomains: 0,
       maxSubdomains: 1,
       maxMembers: 1,
-      bandwidthPerMonth: 1024 * 1024 * 1024 * 2, // 2GB
+      bandwidthPerMonth: 1024 * 1024 * 1024 * 1, // 1GB
       retentionDays: 3,
       customDomains: false,
       prioritySupport: false,
@@ -23,7 +23,7 @@ export const SUBSCRIPTION_PLANS = {
       maxDomains: 1,
       maxSubdomains: 5,
       maxMembers: 3,
-      bandwidthPerMonth: 1024 * 1024 * 1024 * 10, // 10GB
+      bandwidthPerMonth: 1024 * 1024 * 1024 * 5, // 5GB
       retentionDays: 14,
       customDomains: true,
       prioritySupport: false,
@@ -35,10 +35,10 @@ export const SUBSCRIPTION_PLANS = {
     polarProductId: process.env.POLAR_BEAM_PRODUCT_ID,
     features: {
       maxTunnels: 5,
-      maxDomains: 10,
+      maxDomains: 5,
       maxSubdomains: 20,
       maxMembers: 5,
-      bandwidthPerMonth: 1024 * 1024 * 1024 * 50, // 50GB
+      bandwidthPerMonth: 1024 * 1024 * 1024 * 15, // 15GB
       retentionDays: 30,
       customDomains: true,
       prioritySupport: true,
@@ -53,7 +53,7 @@ export const SUBSCRIPTION_PLANS = {
       maxDomains: 25,
       maxSubdomains: 200,
       maxMembers: -1, // Unlimited
-      bandwidthPerMonth: 1024 * 1024 * 1024 * 1024, // 1TB
+      bandwidthPerMonth: 1024 * 1024 * 1024 * 100, // 100GB
       retentionDays: 90,
       customDomains: true,
       prioritySupport: true,
