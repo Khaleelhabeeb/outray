@@ -79,11 +79,7 @@ export function OrganizationDropdown({
                 key={org.id}
                 to={location.pathname.replace(/^\/[^/]+/, `/${org.slug}`)}
                 onClick={() => {
-                  setSelectedOrganization({
-                    id: org.id,
-                    name: org.name,
-                    slug: org.slug,
-                  });
+                  setSelectedOrganization(org);
                   setIsOrgDropdownOpen(false);
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
