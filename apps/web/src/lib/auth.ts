@@ -1,9 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db";
-import { organization } from "better-auth/plugins";
+import { createAuthMiddleware, organization } from "better-auth/plugins";
 import { sendViaZepto } from "./send-email";
 import { ac, admin, member, owner } from "./permissions";
+import { generateEmail } from "@/email/templates";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -36,19 +37,56 @@ export const auth = betterAuth({
         role,
       }) => {
         const invitationLink = `${process.env.APP_URL}/invitations/accept?token=${invitation.id}`;
+        const { html, subject } = generateEmail("organization-invite", {
+          inviterName: inviter?.user.name || "Someone",
+          organizationName: organization.name,
+          role,
+          invitationLink,
+        });
         sendViaZepto({
           recipientEmail: email,
-          subject: `You're invited to join ${organization.name} on OutRay`,
-          htmlString: `
-          <p>Hi,</p>
-          <p>${inviter?.user.name || "Someone"} has invited you to join the organization <strong>${organization.name}</strong> on OutRay with the role of <strong>${role}</strong>.</p>
-          <p>Please click the link below to accept the invitation:</p>
-          <p><a href="${invitationLink}">Accept Invitation</a></p>
-          <p>If you did not expect this invitation, you can safely ignore this email.</p>
-          <p>Cheers,<br/>The OutRay Team</p>
-        `,
+          subject,
+          htmlString: html,
         });
       },
     }),
   ],
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      // Handle both direct sign-up and social auth callback
+      const isSignUp = ctx.path.startsWith("/sign-up");
+      const isCallback = ctx.path.startsWith("/callback");
+
+      if (isSignUp || isCallback) {
+        const newSession = ctx.context.newSession;
+
+        if (newSession) {
+          // Check if user was created within the last 30 seconds (new user)
+          const createdAt = new Date(newSession.user.createdAt).getTime();
+          const now = Date.now();
+          const isNewUser = now - createdAt < 30000; // 30 seconds
+
+          if (isNewUser) {
+            try {
+              const { html, subject } = generateEmail("welcome", {
+                name: newSession.user.name || "User",
+                dashboardUrl: `${process.env.APP_URL}/select`,
+              });
+
+              await sendViaZepto({
+                recipientEmail: newSession.user.email,
+                subject,
+                htmlString: html,
+                senderEmail: "akinkunmi@outray.dev",
+                senderName: "Akinkunmi from OutRay",
+              });
+              console.log("[Welcome Email] Sent to:", newSession.user.email);
+            } catch (error) {
+              console.error("[Welcome Email] Failed to send:", error);
+            }
+          }
+        }
+      }
+    }),
+  },
 });

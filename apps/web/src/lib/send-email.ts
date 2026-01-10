@@ -2,16 +2,18 @@ export async function sendViaZepto({
   recipientEmail,
   htmlString,
   subject,
+  senderEmail = "no-reply@outray.dev",
+  senderName = "OutRay",
 }: {
   recipientEmail: string;
   htmlString: string;
   subject: string;
+  senderEmail?: string;
+  senderName?: string;
 }): Promise<void> {
   const url = "https://api.zeptomail.com/v1.1/email";
   const token = process.env.ZEPTO_API_KEY;
 
-  const senderEmail = "no-reply@outray.dev";
-  const senderName = "OutRay";
   const senderAddress = senderEmail.includes("<")
     ? senderEmail.split("<")[1].replace(">", "").trim()
     : senderEmail;

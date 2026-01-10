@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Navbar } from "@/components/landing/navbar";
 import { SUBSCRIPTION_PLANS } from "@/lib/subscription-plans";
-import { Check, X, Activity } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/pricing")({
   component: PricingPage,
@@ -53,14 +53,14 @@ function PricingPage() {
                   key={plan.id}
                   className={`relative flex flex-col p-8 rounded-3xl border transition-all duration-300 ${
                     plan.id === "beam"
-                      ? "bg-gradient-to-br from-accent/10 via-white/5 to-purple-500/10 border-accent shadow-[0_0_60px_rgba(255,255,255,0.15)] ring-2 ring-accent/30 scale-[1.02]"
+                      ? "bg-linear-to-br from-accent/10 via-white/5 to-purple-500/10 border-accent shadow-[0_0_60px_rgba(255,255,255,0.15)] ring-2 ring-accent/30 scale-[1.02]"
                       : "bg-[#0c0c0c] border-white/10 hover:border-white/20"
                   }`}
                 >
                   {plan.id === "beam" && (
                     <>
-                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-accent/5 via-transparent to-purple-500/5 pointer-events-none" />
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1.5 bg-gradient-to-r from-accent to-yellow-400 text-black text-xs font-bold rounded-full uppercase tracking-wider shadow-lg shadow-accent/30 flex items-center gap-1.5">
+                      <div className="absolute inset-0 rounded-3xl bg-linear-to-br from-accent/5 via-transparent to-purple-500/5 pointer-events-none" />
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1.5 bg-linear-to-r from-accent to-yellow-400 text-black text-xs font-bold rounded-full uppercase tracking-wider shadow-lg shadow-accent/30 flex items-center gap-1.5">
                         <span className="animate-pulse">✨</span>
                         Recommended
                         <span className="animate-pulse">✨</span>
@@ -129,9 +129,7 @@ function PricingPage() {
       <footer className="border-t border-white/10 py-12 bg-black">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-accent rounded-md flex items-center justify-center">
-              <Activity className="w-4 h-4 text-black" />
-            </div>
+            <img src="/logo.png" alt="OutRay Logo" className="w-6" />
             <span className="font-bold">OutRay</span>
           </div>
           <div className="text-white/40 text-sm">
