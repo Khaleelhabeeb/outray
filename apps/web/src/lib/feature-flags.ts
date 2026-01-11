@@ -4,9 +4,9 @@ type FeatureFlag =
   | "full_capture";
 
 const FLAGS: Record<FeatureFlag, boolean> = {
-  request_inspector: false,
-  request_replay: false,
-  full_capture: false,
+  request_inspector: true,
+  request_replay: true,
+  full_capture: true,
 };
 
 export function isFeatureEnabled(flag: FeatureFlag): boolean {
