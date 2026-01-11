@@ -1,0 +1,28 @@
+export interface TunnelEvent {
+  timestamp: number;
+  tunnel_id: string;
+  organization_id: string;
+  host: string;
+  method: string;
+  path: string;
+  status_code: number;
+  request_duration_ms: number;
+  bytes_in: number;
+  bytes_out: number;
+  client_ip: string;
+  user_agent: string;
+}
+
+export type TimeRange = "live" | "1h" | "24h" | "7d" | "30d";
+export type InspectorTab = "request" | "response";
+
+export interface RequestDetails {
+  headers: Record<string, string>;
+  queryParams: Record<string, string>;
+  body: string | null;
+}
+
+export interface ResponseDetails {
+  headers: Record<string, string>;
+  body: string;
+}
