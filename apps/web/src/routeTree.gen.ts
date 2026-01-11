@@ -50,6 +50,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAdminStatsRouteImport } from './routes/api/admin/stats'
 import { Route as ApiAdminLoginRouteImport } from './routes/api/admin/login'
 import { Route as ApiOrgSlugSubscriptionsRouteImport } from './routes/api/$orgSlug/subscriptions'
+import { Route as ApiOrgSlugSettingsRouteImport } from './routes/api/$orgSlug/settings'
 import { Route as ApiOrgSlugRequestsRouteImport } from './routes/api/$orgSlug/requests'
 import { Route as ApiOrgSlugAuthTokensRouteImport } from './routes/api/$orgSlug/auth-tokens'
 import { Route as OrgSlugTunnelsTunnelIdRouteImport } from './routes/$orgSlug/tunnels/$tunnelId'
@@ -278,6 +279,11 @@ const ApiOrgSlugSubscriptionsRoute = ApiOrgSlugSubscriptionsRouteImport.update({
   path: '/api/$orgSlug/subscriptions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrgSlugSettingsRoute = ApiOrgSlugSettingsRouteImport.update({
+  id: '/api/$orgSlug/settings',
+  path: '/api/$orgSlug/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrgSlugRequestsRoute = ApiOrgSlugRequestsRouteImport.update({
   id: '/api/$orgSlug/requests',
   path: '/api/$orgSlug/requests',
@@ -411,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/$orgSlug/tunnels/$tunnelId': typeof OrgSlugTunnelsTunnelIdRoute
   '/api/$orgSlug/auth-tokens': typeof ApiOrgSlugAuthTokensRoute
   '/api/$orgSlug/requests': typeof ApiOrgSlugRequestsRoute
+  '/api/$orgSlug/settings': typeof ApiOrgSlugSettingsRoute
   '/api/$orgSlug/subscriptions': typeof ApiOrgSlugSubscriptionsRoute
   '/api/admin/login': typeof ApiAdminLoginRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
@@ -471,6 +478,7 @@ export interface FileRoutesByTo {
   '/$orgSlug/tunnels/$tunnelId': typeof OrgSlugTunnelsTunnelIdRoute
   '/api/$orgSlug/auth-tokens': typeof ApiOrgSlugAuthTokensRoute
   '/api/$orgSlug/requests': typeof ApiOrgSlugRequestsRoute
+  '/api/$orgSlug/settings': typeof ApiOrgSlugSettingsRoute
   '/api/$orgSlug/subscriptions': typeof ApiOrgSlugSubscriptionsRoute
   '/api/admin/login': typeof ApiAdminLoginRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
@@ -534,6 +542,7 @@ export interface FileRoutesById {
   '/$orgSlug/tunnels/$tunnelId': typeof OrgSlugTunnelsTunnelIdRoute
   '/api/$orgSlug/auth-tokens': typeof ApiOrgSlugAuthTokensRoute
   '/api/$orgSlug/requests': typeof ApiOrgSlugRequestsRoute
+  '/api/$orgSlug/settings': typeof ApiOrgSlugSettingsRoute
   '/api/$orgSlug/subscriptions': typeof ApiOrgSlugSubscriptionsRoute
   '/api/admin/login': typeof ApiAdminLoginRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
@@ -598,6 +607,7 @@ export interface FileRouteTypes {
     | '/$orgSlug/tunnels/$tunnelId'
     | '/api/$orgSlug/auth-tokens'
     | '/api/$orgSlug/requests'
+    | '/api/$orgSlug/settings'
     | '/api/$orgSlug/subscriptions'
     | '/api/admin/login'
     | '/api/admin/stats'
@@ -658,6 +668,7 @@ export interface FileRouteTypes {
     | '/$orgSlug/tunnels/$tunnelId'
     | '/api/$orgSlug/auth-tokens'
     | '/api/$orgSlug/requests'
+    | '/api/$orgSlug/settings'
     | '/api/$orgSlug/subscriptions'
     | '/api/admin/login'
     | '/api/admin/stats'
@@ -720,6 +731,7 @@ export interface FileRouteTypes {
     | '/$orgSlug/tunnels/$tunnelId'
     | '/api/$orgSlug/auth-tokens'
     | '/api/$orgSlug/requests'
+    | '/api/$orgSlug/settings'
     | '/api/$orgSlug/subscriptions'
     | '/api/admin/login'
     | '/api/admin/stats'
@@ -771,6 +783,7 @@ export interface RootRouteChildren {
   InvitationsAcceptRoute: typeof InvitationsAcceptRoute
   ApiOrgSlugAuthTokensRoute: typeof ApiOrgSlugAuthTokensRoute
   ApiOrgSlugRequestsRoute: typeof ApiOrgSlugRequestsRoute
+  ApiOrgSlugSettingsRoute: typeof ApiOrgSlugSettingsRoute
   ApiOrgSlugSubscriptionsRoute: typeof ApiOrgSlugSubscriptionsRoute
   ApiAdminLoginRoute: typeof ApiAdminLoginRoute
   ApiAdminStatsRoute: typeof ApiAdminStatsRoute
@@ -1089,6 +1102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrgSlugSubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/$orgSlug/settings': {
+      id: '/api/$orgSlug/settings'
+      path: '/api/$orgSlug/settings'
+      fullPath: '/api/$orgSlug/settings'
+      preLoaderRoute: typeof ApiOrgSlugSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/$orgSlug/requests': {
       id: '/api/$orgSlug/requests'
       path: '/api/$orgSlug/requests'
@@ -1329,6 +1349,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvitationsAcceptRoute: InvitationsAcceptRoute,
   ApiOrgSlugAuthTokensRoute: ApiOrgSlugAuthTokensRoute,
   ApiOrgSlugRequestsRoute: ApiOrgSlugRequestsRoute,
+  ApiOrgSlugSettingsRoute: ApiOrgSlugSettingsRoute,
   ApiOrgSlugSubscriptionsRoute: ApiOrgSlugSubscriptionsRoute,
   ApiAdminLoginRoute: ApiAdminLoginRoute,
   ApiAdminStatsRoute: ApiAdminStatsRoute,
