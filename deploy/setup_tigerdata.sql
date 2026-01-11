@@ -204,6 +204,7 @@ RETURNS VOID AS $$
 BEGIN
     PERFORM cleanup_expired_tunnel_events();
     PERFORM cleanup_expired_protocol_events();
+    
 END;
 $$ LANGUAGE plpgsql;
 
