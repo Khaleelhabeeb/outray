@@ -3,12 +3,21 @@ import { json } from "@tanstack/react-start";
 import { db } from "../../../db";
 import { cliLoginSessions } from "../../../db/auth-schema";
 import { randomUUID, randomBytes } from "crypto";
+import {rateLimiters, getClientIdentifier, createRateLimitResponse,} from "../../../lib/rate-limiter";
 
 export const Route = createFileRoute("/api/cli/login")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
         try {
+          // Rate limit: 10 requests per minute per IP
+          const clientId = getClientIdentifier(request);
+          const rateLimitResult = await rateLimiters.cliLogin(clientId);
+
+          if (!rateLimitResult.allowed) {
+            return createRateLimitResponse(rateLimitResult);
+          }
+
           const code = randomBytes(32).toString("hex");
           const id = randomUUID();
 
@@ -43,3 +52,4 @@ export const Route = createFileRoute("/api/cli/login")({
     },
   },
 });
+

@@ -4,12 +4,21 @@ import { db } from "../../../db";
 import { cliOrgTokens, members, cliUserTokens } from "../../../db/auth-schema";
 import { eq, and, gt } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
+import {rateLimiters, getClientIdentifier, createRateLimitResponse,} from "../../../lib/rate-limiter";
 
 export const Route = createFileRoute("/api/cli/exchange")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
+          // Rate limit: 20 requests per minute per IP
+          const clientId = getClientIdentifier(request);
+          const rateLimitResult = await rateLimiters.tokenExchange(clientId);
+
+          if (!rateLimitResult.allowed) {
+            return createRateLimitResponse(rateLimitResult);
+          }
+
           const authHeader = request.headers.get("Authorization");
           if (!authHeader?.startsWith("Bearer ")) {
             return json({ error: "Unauthorized" }, { status: 401 });

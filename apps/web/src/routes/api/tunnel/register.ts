@@ -7,12 +7,21 @@ import { tunnels } from "../../../db/app-schema";
 import { subscriptions } from "../../../db/subscription-schema";
 import { getPlanLimits } from "../../../lib/subscription-plans";
 import { redis } from "../../../lib/redis";
+import {rateLimiters, getClientIdentifier, createRateLimitResponse,} from "../../../lib/rate-limiter";
 
 export const Route = createFileRoute("/api/tunnel/register")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
+          // Rate limit: 20 requests per minute per IP
+          const clientId = getClientIdentifier(request);
+          const rateLimitResult = await rateLimiters.tunnelRegister(clientId);
+
+          if (!rateLimitResult.allowed) {
+            return createRateLimitResponse(rateLimitResult);
+          }
+
           const body = (await request.json()) as {
             userId?: string;
             organizationId?: string;

@@ -6,12 +6,21 @@ import { authTokens } from "../../../db/app-schema";
 import { cliOrgTokens } from "../../../db/auth-schema";
 import { subscriptions } from "../../../db/subscription-schema";
 import { SUBSCRIPTION_PLANS } from "../../../lib/subscription-plans";
+import {rateLimiters, getClientIdentifier, createRateLimitResponse,} from "../../../lib/rate-limiter";
 
 export const Route = createFileRoute("/api/tunnel/auth")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
+          // Rate limit: 30 requests per minute per IP
+          const clientId = getClientIdentifier(request);
+          const rateLimitResult = await rateLimiters.tunnelAuth(clientId);
+
+          if (!rateLimitResult.allowed) {
+            return createRateLimitResponse(rateLimitResult);
+          }
+
           const body = await request.json();
           const { token } = body;
 
