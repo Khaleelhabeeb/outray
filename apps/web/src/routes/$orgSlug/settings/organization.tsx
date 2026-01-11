@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Hash, Type, Database, Shield } from "lucide-react";
-import { useAppStore } from "@/lib/store";
 import { authClient } from "@/lib/auth-client";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
