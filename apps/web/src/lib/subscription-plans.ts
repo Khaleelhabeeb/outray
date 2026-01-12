@@ -59,6 +59,22 @@ export const SUBSCRIPTION_PLANS = {
       prioritySupport: true,
     },
   },
+  // Internal plan - not shown in UI, manually assigned via database
+  unlimited: {
+    name: "Unlimited",
+    price: 0,
+    hidden: true,
+    features: {
+      maxTunnels: -1,
+      maxDomains: -1,
+      maxSubdomains: -1,
+      maxMembers: -1,
+      bandwidthPerMonth: -1,
+      retentionDays: -1,
+      customDomains: true,
+      prioritySupport: true,
+    },
+  },
 } as const;
 
 export type SubscriptionPlan = keyof typeof SUBSCRIPTION_PLANS;

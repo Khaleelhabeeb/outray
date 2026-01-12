@@ -252,7 +252,9 @@ const {data:orgs}=authClient.useListOrganizations();
             </h3>
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               {(
-                Object.entries(SUBSCRIPTION_PLANS) as [
+                Object.entries(SUBSCRIPTION_PLANS).filter(
+                  ([_, plan]) => !("hidden" in plan && plan.hidden)
+                ) as [
                   keyof typeof SUBSCRIPTION_PLANS,
                   (typeof SUBSCRIPTION_PLANS)[keyof typeof SUBSCRIPTION_PLANS],
                 ][]

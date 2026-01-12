@@ -8,10 +8,12 @@ export const Route = createFileRoute("/pricing")({
 });
 
 function PricingPage() {
-  const plans = Object.entries(SUBSCRIPTION_PLANS).map(([key, plan]) => ({
-    id: key,
-    ...plan,
-  }));
+  const plans = Object.entries(SUBSCRIPTION_PLANS)
+    .filter(([_, plan]) => !("hidden" in plan && plan.hidden))
+    .map(([key, plan]) => ({
+      id: key,
+      ...plan,
+    }));
 
   const formatBandwidth = (bytes: number) => {
     const gb = bytes / (1024 * 1024 * 1024);
