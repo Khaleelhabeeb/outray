@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/admin/users")({
                 like(users.email, `%${search}%`),
                 like(users.name, `%${search}%`)
               )
-            : undefined;
+            : sql`1=1`;
 
           // Get total count
           const [totalResult] = await db
