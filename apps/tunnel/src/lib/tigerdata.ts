@@ -129,7 +129,6 @@ class TimescaleDBLogger {
   public async shutdown() {
     clearInterval(this.flushInterval);
     await this.flush();
-    await pool.end();
   }
 }
 
@@ -394,3 +393,15 @@ class ProtocolLogger {
 }
 
 export const protocolLogger = new ProtocolLogger();
+
+/**
+ * Shuts down all loggers and closes the database connection pool.
+ * This should be called when the server is shutting down to ensure
+ * all buffered data is flushed before the process exits.
+ */
+export async function shutdownLoggers(): Promise<void> {
+  await logger.shutdown();
+  await requestCaptureLogger.shutdown();
+  await protocolLogger.shutdown();
+  await pool.end();
+}
