@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CreditCard, Building2, Calendar, DollarSign, TrendingUp } from "lucide-react";
 import { appClient } from "@/lib/app-client";
 import { AdminDataTable, type Column } from "@/components/admin/admin-data-table";
@@ -24,15 +25,6 @@ interface Subscription {
   orgSlug: string | null;
 }
 
-interface Stats {
-  mrr: number;
-  arr: number;
-  totalActive: number;
-  totalCancelled: number;
-  activeByPlan: Record<string, number>;
-  recentChanges: number;
-}
-
 const planColors: Record<string, string> = {
   free: "bg-gray-500/10 text-gray-400 border-gray-500/20",
   ray: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -49,53 +41,27 @@ const statusColors: Record<string, string> = {
 
 function AdminSubscriptionsPage() {
   const token = useAdminStore((s) => s.token);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [planFilter, setPlanFilter] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
-  useEffect(() => {
-    if (!token) return;
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["admin", "subscriptions", page, planFilter],
+    queryFn: async () => {
+      const res = await appClient.admin.subscriptions(token!, { page, plan: planFilter });
+      if ("error" in res) throw new Error(res.error);
+      return res;
+    },
+    enabled: !!token,
+  });
 
-    const fetchSubscriptions = async () => {
-      setIsLoading(true);
-    const fetchSubscriptions = async () => {
-      setIsLoading(true);
-      try {
-        const res = await appClient.admin.subscriptions(token, {
-          page,
-          plan: planFilter,
-        });
-        if ("error" in res) {
-          console.error("Failed to fetch subscriptions:", res.error);
-          return;
-        }
-        setSubscriptions(res.subscriptions);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-        setStats(res.stats);
-      } catch (error) {
-        console.error("Failed to fetch subscriptions:", error);
-      } finally {
-        setIsLoading(false);
-        setInitialLoad(false);
-      }
-    };
-      setStats(res.stats);
-      setIsLoading(false);
-      setInitialLoad(false);
-    };
-
-    fetchSubscriptions();
-  }, [token, page, planFilter]);
-
-  if (!token || initialLoad) {
+  if (!token || (isLoading && !data)) {
     return <SubscriptionsSkeleton />;
   }
+
+  const subscriptions = data?.subscriptions ?? [];
+  const stats = data?.stats;
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return "-";
@@ -187,12 +153,12 @@ function AdminSubscriptionsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <AdminStatsCard
           title="Monthly Revenue"
-          value={`$${stats?.mrr?.toLocaleString() || "0"}`}
+          value={`${stats?.mrr?.toLocaleString() || "0"}`}
           icon={<DollarSign size={20} />}
         />
         <AdminStatsCard
           title="Annual Revenue"
-          value={`$${stats?.arr?.toLocaleString() || "0"}`}
+          value={`${stats?.arr?.toLocaleString() || "0"}`}
           icon={<TrendingUp size={20} />}
         />
         <AdminStatsCard
@@ -239,7 +205,7 @@ function AdminSubscriptionsPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        isLoading={isLoading}
+        isLoading={isFetching}
         emptyMessage="No subscriptions found"
       />
     </div>

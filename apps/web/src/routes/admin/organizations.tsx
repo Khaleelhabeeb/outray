@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Building2, Users, Network } from "lucide-react";
 import { appClient } from "@/lib/app-client";
 import { AdminDataTable, type Column } from "@/components/admin/admin-data-table";
@@ -30,40 +31,27 @@ const planColors: Record<string, string> = {
 
 function AdminOrganizationsPage() {
   const token = useAdminStore((s) => s.token);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
-  useEffect(() => {
-    if (!token) return;
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["admin", "organizations", page, search],
+    queryFn: async () => {
+      const res = await appClient.admin.organizations(token!, { page, search });
+      if ("error" in res) throw new Error(res.error);
+      return res;
+    },
+    enabled: !!token,
+  });
 
-    const fetchOrgs = async () => {
-      setIsLoading(true);
-      const res = await appClient.admin.organizations(token, { page, search });
-      if ("error" in res) {
-        console.error("Failed to fetch organizations:", res.error);
-        setIsLoading(false);
-        setInitialLoad(false);
-        return;
-      }
-      setOrganizations(res.organizations);
-      setTotalPages(res.totalPages);
-      setTotal(res.total);
-      setIsLoading(false);
-      setInitialLoad(false);
-    };
-
-    fetchOrgs();
-  }, [token, page, search]);
-
-  if (!token || initialLoad) {
+  if (!token || (isLoading && !data)) {
     return <UsersSkeleton />;
   }
+
+  const organizations = data?.organizations ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +177,7 @@ function AdminOrganizationsPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        isLoading={isLoading}
+        isLoading={isFetching}
         emptyMessage="No organizations found"
       />
     </div>

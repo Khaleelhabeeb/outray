@@ -1,32 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  ComposedChart,
+  AreaChart, Area, BarChart, Bar, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart,
 } from "recharts";
-import {
-  TrendingUp,
-  Users,
-  Building2,
-  Network,
-  Activity,
-  Shield,
-  Crown,
-  Zap,
-} from "lucide-react";
+import { TrendingUp, Users, Building2, Network, Activity, Shield, Crown, Zap } from "lucide-react";
 import { appClient } from "@/lib/app-client";
 import { ChartsSkeleton } from "@/components/admin/admin-skeleton";
 import { useAdminStore } from "@/lib/admin-store";
@@ -34,10 +12,6 @@ import { useAdminStore } from "@/lib/admin-store";
 export const Route = createFileRoute("/admin/charts")({
   component: AdminChartsPage,
 });
-
-// Derive types from the API client
-type AdminChartsApiResponse = Awaited<ReturnType<typeof appClient.admin.charts>>;
-type AdminChartsData = Exclude<AdminChartsApiResponse, { error: string }>;
 
 interface ChartDataItem {
   name: string;
@@ -70,30 +44,16 @@ const tooltipStyle = {
 
 function AdminChartsPage() {
   const token = useAdminStore((s) => s.token);
-  const [data, setData] = useState<AdminChartsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!token) return;
-
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const res = await appClient.admin.charts(token);
-        if ("error" in res) {
-          console.error("Failed to fetch charts:", res.error);
-          return;
-        }
-        setData(res);
-      } catch (error) {
-        console.error("Failed to fetch charts:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [token]);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "charts"],
+    queryFn: async () => {
+      const res = await appClient.admin.charts(token!);
+      if ("error" in res) throw new Error(res.error);
+      return res;
+    },
+    enabled: !!token,
+  });
 
   if (!token || isLoading || !data) {
     return <ChartsSkeleton />;
@@ -109,26 +69,18 @@ function AdminChartsPage() {
     return date.toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
   };
 
-  // Prepare verification data for pie chart
   const verificationData: ChartDataItem[] = data.verificationStatus.map((v) => ({
     name: v.verified ? "Verified" : "Unverified",
     value: v.count,
     color: v.verified ? COLORS.quaternary : COLORS.danger,
   }));
 
-  // Prepare subscription status data
   const subStatusData: ChartDataItem[] = data.subStatus.map((s) => ({
     name: s.status.charAt(0).toUpperCase() + s.status.slice(1),
     value: s.count,
-    color:
-      s.status === "active"
-        ? COLORS.quaternary
-        : s.status === "cancelled"
-          ? COLORS.danger
-          : COLORS.gray,
+    color: s.status === "active" ? COLORS.quaternary : s.status === "cancelled" ? COLORS.danger : COLORS.gray,
   }));
 
-  // Prepare protocol data
   const protocolData: ChartDataItem[] = data.protocolDist.map((p) => ({
     name: p.protocol.toUpperCase(),
     value: p.count,
@@ -138,12 +90,8 @@ function AdminChartsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white tracking-tight">
-          Analytics Dashboard
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Deep dive into your platform metrics
-        </p>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Analytics Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Deep dive into your platform metrics</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -164,29 +112,10 @@ function AdminChartsPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatDate}
-                  stroke="#666"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="date" tickFormatter={formatDate} stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelFormatter={(label) => formatDate(label)}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "#9ca3af" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="total"
-                  stroke={COLORS.primary}
-                  strokeWidth={2}
-                  fill="url(#colorGrowth)"
-                  name="Total Users"
-                />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => formatDate(label)} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
+                <Area type="monotone" dataKey="total" stroke={COLORS.primary} strokeWidth={2} fill="url(#colorGrowth)" name="Total Users" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -203,21 +132,9 @@ function AdminChartsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.userSignups}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatDate}
-                  stroke="#666"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="date" tickFormatter={formatDate} stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelFormatter={(label) => formatDate(label)}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "#9ca3af" }}
-                />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => formatDate(label)} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
                 <Bar dataKey="count" fill={COLORS.secondary} radius={[4, 4, 0, 0]} name="Signups" />
               </BarChart>
             </ResponsiveContainer>
@@ -235,21 +152,9 @@ function AdminChartsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.orgGrowth}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatDate}
-                  stroke="#666"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="date" tickFormatter={formatDate} stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelFormatter={(label) => formatDate(label)}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "#9ca3af" }}
-                />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => formatDate(label)} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
                 <Bar dataKey="count" fill={COLORS.tertiary} radius={[4, 4, 0, 0]} name="Organizations" />
               </BarChart>
             </ResponsiveContainer>
@@ -267,21 +172,9 @@ function AdminChartsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data.weeklyTunnelTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  tickFormatter={formatDate}
-                  stroke="#666"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="day" tickFormatter={formatDate} stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelFormatter={(label) => formatDate(label)}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "#9ca3af" }}
-                />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => formatDate(label)} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
                 <Legend wrapperStyle={{ color: "#9ca3af" }} />
                 <Bar dataKey="max" fill={COLORS.quaternary} opacity={0.3} radius={[4, 4, 0, 0]} name="Max" />
                 <Line type="monotone" dataKey="avg" stroke={COLORS.quaternary} strokeWidth={2} dot={false} name="Average" />
@@ -307,29 +200,10 @@ function AdminChartsPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="hour"
-                  tickFormatter={formatHour}
-                  stroke="#666"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                <XAxis dataKey="hour" tickFormatter={formatHour} stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelFormatter={(label) => formatHour(label)}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "#9ca3af" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="requests"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  fill="url(#colorHourly)"
-                  name="Activity"
-                />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(label) => formatHour(label)} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
+                <Area type="monotone" dataKey="requests" stroke="#F59E0B" strokeWidth={2} fill="url(#colorHourly)" name="Activity" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -345,18 +219,8 @@ function AdminChartsPage() {
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={protocolData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {protocolData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                <Pie data={protocolData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                  {protocolData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#fff" }} />
               </PieChart>
@@ -383,18 +247,8 @@ function AdminChartsPage() {
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={verificationData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {verificationData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                <Pie data={verificationData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                  {verificationData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#fff" }} />
               </PieChart>
@@ -421,18 +275,8 @@ function AdminChartsPage() {
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={subStatusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {subStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                <Pie data={subStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                  {subStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#fff" }} />
               </PieChart>
@@ -461,16 +305,7 @@ function AdminChartsPage() {
               <BarChart data={data.topOrgsByTunnels} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                 <XAxis type="number" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis
-                  type="category"
-                  dataKey="orgName"
-                  stroke="#666"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  width={150}
-                  tick={{ fill: "#9ca3af" }}
-                />
+                <YAxis type="category" dataKey="orgName" stroke="#666" fontSize={12} tickLine={false} axisLine={false} width={150} tick={{ fill: "#9ca3af" }} />
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#9ca3af" }} />
                 <Bar dataKey="tunnelCount" fill={COLORS.tertiary} radius={[0, 4, 4, 0]} name="Tunnels" />
               </BarChart>

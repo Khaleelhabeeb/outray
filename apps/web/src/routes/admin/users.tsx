@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Users, Mail, Building2, Calendar } from "lucide-react";
 import { appClient } from "@/lib/app-client";
 import { AdminDataTable, type Column } from "@/components/admin/admin-data-table";
@@ -23,40 +24,27 @@ interface User {
 
 function AdminUsersPage() {
   const token = useAdminStore((s) => s.token);
-  const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
-  useEffect(() => {
-    if (!token) return;
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["admin", "users", page, search],
+    queryFn: async () => {
+      const res = await appClient.admin.users(token!, { page, search });
+      if ("error" in res) throw new Error(res.error);
+      return res;
+    },
+    enabled: !!token,
+  });
 
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      const res = await appClient.admin.users(token, { page, search });
-      if ("error" in res) {
-        console.error("Failed to fetch users:", res.error);
-        setIsLoading(false);
-        setInitialLoad(false);
-        return;
-      }
-      setUsers(res.users);
-      setTotalPages(res.totalPages);
-      setTotal(res.total);
-      setIsLoading(false);
-      setInitialLoad(false);
-    };
-
-    fetchUsers();
-  }, [token, page, search]);
-
-  if (!token || initialLoad) {
+  if (!token || (isLoading && !data)) {
     return <UsersSkeleton />;
   }
+
+  const users = data?.users ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +187,7 @@ function AdminUsersPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        isLoading={isLoading}
+        isLoading={isFetching}
         emptyMessage="No users found"
       />
     </div>
